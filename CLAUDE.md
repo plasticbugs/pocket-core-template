@@ -78,6 +78,12 @@ until it is checked, and commit at each one.
   (`pkg/pocket/Platforms/_images/<shortname>.bin`) is made by the user and
   supplied when it is ready; the core works without one, so leave it out until
   then and do not generate a stand-in from screenshots.
+- **Keep attribution intact and keep `CREDITS.md` current.** Never strip or
+  rewrite an SPDX or copyright header in `platform/` or `modules/` — those
+  headers are the licence. `platform/pocket/` is Marcus Andrade's
+  OpenGateware `gateman-pocket` platform and the build runs in his
+  `raetro/quartus:pocket` image; when you vendor a CPU or sound core, record
+  it in `modules/VENDOR.md` and name its author in the README.
 - When the user reports something from hardware, **believe it, and parse it**:
   "only during gameplay", "gone when the menu is open", "on alternate lines"
   are each half a diagnosis.
@@ -102,6 +108,7 @@ until it is checked, and commit at each one.
 
 ```
 CLAUDE.md METHODOLOGY.md README.md      read in that order
+CREDITS.md                              whose work this sits on; extend, never trim
 docs/hardware.md                        the board, from MAME and the ROM — write first
 docs/core-design.md                     how it maps onto the Pocket, and the budgets
 docs/bringup.md                         what to do and read at the first flash
@@ -114,7 +121,7 @@ target/pocket/core_top.sv               APF glue; game-specific only below "@ Th
 target/pocket/mycore_mem.sv             SDRAM clients, download FIFO, burst arbiter, SRAM
 target/pocket/sdram_ctrl.sv sram_port.sv   proven on hardware; do not edit casually
 projects/                               Quartus project, SDC, report_worst.tcl
-platform/pocket/                        the opengateware framework — shared, leave alone
+platform/pocket/                        OpenGateware's gateman-pocket (Marcus Andrade) — leave alone
 pkg/pocket/                             what goes on the SD card (never a ROM)
 sim/lint.sh                             every module linted on its own
 sim/run_mem.sh                          THE MEMORY GATE — run before the first flash

@@ -54,7 +54,17 @@ against MAME, the RTL against the renderer, the whole machine, the sound.
 
 ## Credits
 
-MAME, for the driver and devices this was written against (`ref/mame/`). The
-vendored cores and their authors (`modules/VENDOR.md`). The
-openFPGA/opengateware framework in `platform/pocket/`. Anyone whose board
-photographs, schematics or measurements are in `docs/hardware.md`.
+`CREDITS.md` is the full list, and a core should extend it with its own. The
+short of it: **Marcus Andrade**
+([@boogermann](https://github.com/boogermann),
+[OpenGateware](https://github.com/opengateware) /
+[Raetro](https://github.com/raetro)) wrote everything between the arcade
+hardware and the Pocket — `platform/pocket/` is OpenGateware's
+`gateman-pocket` platform, 41 of its 63 files are his, `projects/` came from
+his Gateman CLI, `target/pocket/core_top.sv` starts from his template, and
+every build here runs in his `raetro/quartus:pocket` Docker image.
+
+Then: MAME, for the driver and devices this was written against (`ref/mame/`);
+the vendored cores and their authors (`modules/VENDOR.md`); Analogue, for the
+APF; and anyone whose board photographs, schematics or measurements are in
+`docs/hardware.md`.

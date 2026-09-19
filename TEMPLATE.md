@@ -27,6 +27,15 @@ CPU to blame.
 | `tools/init_core.py` | a stamped copy lints, passes the gate and synthesises |
 | **on a Pocket** | **the skeleton itself has not been run.** Everything around `mycore_core.sv` is the code Master of Weapon v0.1.1 runs on hardware; the skeleton's own raster and pattern are new and unflashed. Flash it first and fix this line. |
 
+## Whose work this is
+
+The skeleton, the benches, the tooling and the method are the new part.
+Everything between the arcade hardware and the Pocket — `platform/pocket/`,
+the Quartus project, the half of `core_top.sv` above the "@ The game" banner,
+and the Docker image every build runs in — is **Marcus Andrade's**
+(OpenGateware / Raetro). `CREDITS.md` has the detail; extend it in the core,
+never trim it.
+
 ## Start here
 
 On GitHub, **Use this template** → a new repository, then clone it. Or with

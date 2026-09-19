@@ -52,7 +52,7 @@ against it constantly.**
 | MAME (`brew install mame`) | Oracle | Use `-video none -sound none -nothrottle -skip_gameinfo`, and always `-cfg_directory`/`-nvram_directory` pointing somewhere disposable |
 | MAME Lua (`-autoboot_script`) | Instrumentation | `install_write_tap`, `register_frame_done`, `ioport` fields, `machine.video:snapshot()`, `-wavwrite` |
 | Verilator | RTL simulation | Fast enough for whole-frame and whole-second simulations |
-| Quartus 18.1 in Docker | Synthesis | `raetro/quartus:pocket`, `--platform linux/amd64` on Apple silicon |
+| Quartus 18.1 in Docker | Synthesis | `raetro/quartus:pocket` — Marcus Andrade's image; `--platform linux/amd64` on Apple silicon |
 | Ghidra (optional, via MCP) | Disassembly | Only as far as needed to answer specific questions |
 | Python 3 | Everything else | Reference renderer, image diffing, ROM building, audio analysis. No numpy needed |
 
