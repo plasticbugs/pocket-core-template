@@ -29,7 +29,17 @@ CPU to blame.
 
 ## Start here
 
-From the directory the template sits in (`~/work`):
+On GitHub, **Use this template** → a new repository, then clone it. Or with
+the CLI:
+
+```sh
+gh repo create <shortname> --private --template plasticbugs/pocket-core-template
+git clone https://github.com/<you>/<shortname>.git && cd <shortname>
+tools/init_core.py <shortname> "<Title>"
+tools/gen_qip.sh && sim/lint.sh && sim/run_mem.sh -quick
+```
+
+Locally, from the directory the template sits in (`~/work`):
 
 ```sh
 git clone pocket-core-template <shortname>      # tracked files only: 1.2 MB,
@@ -42,6 +52,12 @@ tools/gen_qip.sh && sim/lint.sh && sim/run_mem.sh -quick
 build database and a compiled bench that a copy would drag into the new core.
 `init_core.py` refuses to run twice, so a mis-typed name is recoverable by
 starting the clone again.
+
+**Fixes go back upstream.** `platform/`, `sdram_ctrl.sv`, `sram_port.sv`,
+`interact.sv` and `core_top.sv`'s framework half are the same in every core
+here. A bug fixed in one of them in a core is a bug still waiting in the next
+one unless it is also fixed here — which is how the download corruption and
+the menu reset each reached two cores.
 
 Then read `CLAUDE.md`, then `METHODOLOGY.md`, and start `docs/hardware.md`.
 The platform image is artwork the user supplies; `icon.bin` is the house icon
