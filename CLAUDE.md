@@ -34,8 +34,9 @@ until it is checked, and commit at each one.
    Ghidra on the program ROM for anything the driver leaves implicit. No RTL
    yet.
 3. **The ROM image.** Write `mycore.mra`, build the image with
-   `tools/mra_build.py`, and make `tools/verify_rom.py` prove every region is
-   byte-identical to what MAME hands the chips. Set the region bases in
+   `tools/mra_build.py`, and write a `tools/verify_rom.py` (the pattern is in
+   `tools/examples/`) that proves every region is byte-identical to what MAME
+   hands the chips. Set the region bases in
    `target/pocket/mycore_mem.sv` and `sim/tb_mem.cpp` to match, and run
    `sim/run_mem.sh`.
 4. **The reference renderer** (`tools/`), pixel-identical to MAME on captured
@@ -117,7 +118,8 @@ platform/pocket/                        the opengateware framework — shared, l
 pkg/pocket/                             what goes on the SD card (never a ROM)
 sim/lint.sh                             every module linted on its own
 sim/run_mem.sh                          THE MEMORY GATE — run before the first flash
-tools/                                  MAME wrappers, ROM builder, image tools, ROM guard
+tools/                                  MAME wrappers, ROM builder, pixel diff, ROM guard, release
+tools/examples/                         game-specific tools from Master of Weapon, as patterns
 build-local.sh  package-pocket.py       Quartus 18.1 in Docker; the SD-card package
 .github/workflows/compile.yml           lint, compile, constraint check, timing check
 ```
