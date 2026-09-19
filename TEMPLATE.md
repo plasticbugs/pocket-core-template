@@ -29,11 +29,19 @@ CPU to blame.
 
 ## Start here
 
+From the directory the template sits in (`~/work`):
+
 ```sh
-cp -R pocket-core-template ../<shortname> && cd ../<shortname> && rm -rf .git && git init
-tools/init_core.py <shortname> "<Title>"
+git clone pocket-core-template <shortname>      # tracked files only: 1.2 MB,
+cd <shortname> && rm -rf .git && git init       # not the 35 MB Quartus database
+tools/init_core.py <shortname> "<Title>"        # stamps the names through the tree
 tools/gen_qip.sh && sim/lint.sh && sim/run_mem.sh -quick
 ```
+
+`git clone` rather than `cp -R`: the template's working tree carries a Quartus
+build database and a compiled bench that a copy would drag into the new core.
+`init_core.py` refuses to run twice, so a mis-typed name is recoverable by
+starting the clone again.
 
 Then read `CLAUDE.md`, then `METHODOLOGY.md`, and start `docs/hardware.md`.
 The platform image is artwork the user supplies; `icon.bin` is the house icon
