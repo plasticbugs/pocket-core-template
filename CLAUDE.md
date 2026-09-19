@@ -107,7 +107,7 @@ until it is checked, and commit at each one.
 ## The map
 
 ```
-CLAUDE.md METHODOLOGY.md README.md      read in that order
+CLAUDE.md METHODOLOGY.md README.md      read in that order (README is the core's own after init)
 CREDITS.md                              whose work this sits on; extend, never trim
 docs/hardware.md                        the board, from MAME and the ROM — write first
 docs/core-design.md                     how it maps onto the Pocket, and the budgets

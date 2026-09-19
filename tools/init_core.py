@@ -31,6 +31,7 @@ def main():
 
     def sub(t):
         return (t.replace('plasticbugs.mycore', f'{author}.{short}')
+                 .replace('github.com/plasticbugs/', f'github.com/{author}/')
                  .replace('analogue-pocket-mycore', f'analogue-pocket-{short}')
                  .replace('My Core', title).replace('MY CORE', title.upper())
                  .replace('mycore', short).replace('MYCORE', short.upper()))
@@ -58,6 +59,17 @@ def main():
             if 'mycore' in dn and dn not in SKIP_DIRS:
                 os.rename(os.path.join(dp, dn), os.path.join(dp, sub(dn)))
 
+    # The template's own front page and its notes become the core's: the core
+    # gets the README stub, and the instructions for starting a core from the
+    # template have no business travelling into one.
+    src = os.path.join(ROOT, 'docs', 'core-README.md')
+    if os.path.exists(src):
+        os.replace(src, os.path.join(ROOT, 'README.md'))
+    for gone in ('TEMPLATE.md',):
+        q = os.path.join(ROOT, gone)
+        if os.path.exists(q):
+            os.remove(q)
+
     # the generic author string, where it stands alone
     if author != 'plasticbugs':
         for p in ('pkg/pocket/Cores/%s.%s/core.json' % (author, short), 'package-pocket.py'):
@@ -66,6 +78,7 @@ def main():
                 t = open(q).read(); open(q, 'w').write(t.replace('"plasticbugs"', f'"{author}"'))
 
     print(f'{changed} files rewritten for {author}.{short} ("{title}").')
+    print('README.md is now the core\'s own; TEMPLATE.md is gone.')
     print('Next: tools/gen_qip.sh, then sim/lint.sh, then sim/run_mem.sh -quick.')
     print('Then fill in README.md and start docs/hardware.md from MAME\'s driver.')
 
