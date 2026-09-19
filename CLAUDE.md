@@ -134,7 +134,7 @@ build-local.sh  package-pocket.py       Quartus 18.1 in Docker; the SD-card pack
 ## Commands
 
 ```sh
-tools/init_core.py galaga "Galaga" plasticbugs   # once
+tools/init_core.py galaga "Galaga" <github-handle>   # once, before anything else
 sim/lint.sh                  # seconds; before every commit
 sim/run_mem.sh -quick        # a minute; after touching mycore_mem.sv (drop -quick before a flash)
 ./build-local.sh map         # two minutes; catches what Verilator cannot
