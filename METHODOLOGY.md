@@ -778,8 +778,10 @@ nothing.
 A BBC Micro core shipped a picture that alternated between two images at
 25 Hz. The user reported "a 60Hz vertical jitter, almost like looking at a
 CRT — the flicker is in the onscreen text", and by the time it was diagnosed
-it had **burned permanently into their Pocket's OLED**. Nothing else in this
-document costs the reader hardware.
+it had left a **visible ghost on their Pocket's OLED**. That one faded after
+a few hours of other games — it was image retention, not burn-in — but OLED
+wear is cumulative and the margin between the two is exposure. Nothing else
+in this document risks the reader's hardware at all.
 
 The cause was honest emulation. The machine's CRTC is programmed for
 interlace sync and video, so the field number becomes the low bit of the
@@ -813,9 +815,10 @@ comparison that cannot see an alternation.
   frame-alternation, a "blend two frames for transparency" trick from a
   console core — the panel holds all of them. If the machine's own display
   relied on persistence to merge something, the core has to do the merging.
-- **When a picture fault reaches a user, ask for the panel before the next
-  build, and stop the core in the meantime.** The cost of a wrong frame on an
-  OLED is not a wasted flash cycle; it is the user's hardware.
+- **When a picture fault reaches a user, tell them to stop running the core
+  before the next build.** The cost of a wrong frame on an OLED is not a
+  wasted flash cycle, and the fix arriving twenty minutes later is twenty
+  minutes of exposure that did not need to happen.
 
 A second, unrelated fault in the same core produced three symptoms that
 looked like three bugs: `video.json` declared `320x224` from the arcade

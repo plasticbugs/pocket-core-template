@@ -103,7 +103,7 @@ until it is checked, and commit at each one.
 | A constraint that silently matches nothing | CI step "Check every constraint was applied" | 5.20 |
 | SDRAM capture timing | the PLL phase is a dial between setup and hold; how to set it is in the SDC | 5.20 |
 | Aspect ratio with a rotated picture | it describes the raster *before* rotation | 5.5 |
-| **A picture that alternates between frames burns into the Pocket's OLED** | `tools/check_frames.py` on three consecutive frames of a still screen, before the first flash | 5.23 |
+| **A picture that alternates between frames marks the Pocket's OLED** | `tools/check_frames.py` on three consecutive frames of a still screen, before the first flash | 5.23 |
 | An interlaced CRTC faithfully alternating fields | keep the geometry, draw the same field every frame | 5.23 |
 | `video.json` declaring a size the core does not emit | `tools/check_json.py --active WxH`; the symptom is three bugs at once | 5.23 |
 | `interact.json` the firmware refuses with "General Error" | `tools/check_json.py`; ids unique, `defaultval` is an option INDEX, no value with bit 31 set | 5.23 |
@@ -141,8 +141,8 @@ build-local.sh  package-pocket.py       Quartus 18.1 in Docker; the SD-card pack
 tools/init_core.py galaga "Galaga" <github-handle>   # once, before anything else
 sim/lint.sh                  # seconds; before every commit
 tools/check_frames.py artifacts/still -w W -h H   # THREE CONSECUTIVE frames of a
-                             # still screen.  A picture that alternates burns into
-                             # the Pocket's OLED -- run it before the first flash
+                             # still screen.  A picture that alternates leaves a
+                             # ghost on the Pocket's OLED -- before the first flash
 tools/check_json.py pkg/pocket --active WxH       # what the firmware silently refuses
 sim/run_mem.sh -quick        # a minute; after touching mycore_mem.sv (drop -quick before a flash)
 ./build-local.sh map         # two minutes; catches what Verilator cannot

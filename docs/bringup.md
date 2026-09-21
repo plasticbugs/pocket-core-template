@@ -11,9 +11,10 @@ someone decodes squares off a screen.
   picture** — snapshot the boot screen at, say, 2500, 2520 and 2540 ms and run
   it on the three. If neighbours differ while frames two apart are identical,
   the core is emitting alternating fields. The Pocket's panel is OLED and
-  holds the difference between the two images **permanently**. A core shipped
-  this way and burned a user's screen; nothing else on this list costs
-  hardware. Do not flash until it passes (METHODOLOGY 5.23).
+  holds the difference between the two images — as retention that fades, and
+  with enough hours as wear that does not. A core shipped this way and left a
+  ghost on a user's screen; nothing else on this list touches their hardware.
+  Do not flash until it passes (METHODOLOGY 5.23).
 - `tools/check_json.py pkg/pocket --active <W>x<H>` clean — the firmware
   refuses a bad `interact.json` with nothing but "General Error", and a
   `video.json` that disagrees with the core comes out as three separate-looking
