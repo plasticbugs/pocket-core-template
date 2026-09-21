@@ -109,7 +109,7 @@
                 "mask": "0xFFFFFFF7"
             },
             {
-                "name": "Bring-up: SDRAM alt read capture",
+                "name": "SDRAM read late",
                 "id": 91,
                 "type": "check",
                 "enabled": true,
@@ -120,7 +120,7 @@
                 "mask": "0xFFFFFFEF"
             },
             {
-                "name": "Bring-up: SDRAM slow bursts",
+                "name": "SDRAM slow bursts",
                 "id": 92,
                 "type": "check",
                 "enabled": true,
@@ -131,7 +131,7 @@
                 "mask": "0xFFFFFFDF"
             },
             {
-                "name": "Bring-up: SRAM late read capture",
+                "name": "SRAM read late",
                 "id": 93,
                 "type": "check",
                 "enabled": true,
@@ -142,7 +142,7 @@
                 "mask": "0xFFFFFF7F"
             },
             {
-                "name": "Bring-up: SRAM stretched writes",
+                "name": "SRAM long writes",
                 "id": 94,
                 "type": "check",
                 "enabled": true,

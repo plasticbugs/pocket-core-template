@@ -773,6 +773,59 @@ nothing.
   The "wrong" read-back was correct; my expectation used a region base that was
   never in the design.
 
+### 5.23 The panel is not a CRT, and burn-in is permanent *(BBC Micro)*
+
+A BBC Micro core shipped a picture that alternated between two images at
+25 Hz. The user reported "a 60Hz vertical jitter, almost like looking at a
+CRT — the flicker is in the onscreen text", and by the time it was diagnosed
+it had **burned permanently into their Pocket's OLED**. Nothing else in this
+document costs the reader hardware.
+
+The cause was honest emulation. The machine's CRTC is programmed for
+interlace sync and video, so the field number becomes the low bit of the
+scanline address and one field's vsync is delayed by half a line
+(`RA <= line_counter(4 downto 1) & odd_field`). Alternate frames genuinely
+draw different scanlines of every character from a different vertical
+origin. A CRT's phosphor and a viewer's eye merge the two fields; that is
+what interlace is *for*. A fixed-pixel panel fed one field per frame merges
+nothing, and an OLED fed the difference forever keeps it.
+
+Every gate this project had passed. Frames matched MAME. The memory gate
+passed, timing closed, the frozen states agreed. **No bench had ever compared
+one frame with the next one** — every comparison was against an emulator's
+frame or against another run's frame *at the same time*, which is exactly the
+comparison that cannot see an alternation.
+
+- **Compare consecutive frames of a still picture, before the first flash.**
+  `tools/check_frames.py` does it: neighbours differing while frames two apart
+  are identical is an alternation, and it exits non-zero. Three frames of a
+  boot screen is enough. Put it in the pre-flash list beside `run_mem.sh`.
+- **A user saying "like a CRT" is naming the mechanism, not reaching for a
+  simile.** Interlace shimmer looks like interlace shimmer. Parse it as a
+  diagnosis (5.15).
+- **Do not stop emulating interlace — stop alternating.** Keep the geometry
+  the machine asks for, ten scanlines a row and 312 lines at 50 Hz, and draw
+  the *same* field every frame. In the vendored `mc6845` that is three lines:
+  hold `odd_field` at zero, always select the even field's vsync, and let a
+  new frame start every field instead of every second one.
+- **Any output that alternates is a burn-in risk, not only interlace.** A
+  dither that toggles per frame, a flashing cursor implemented as
+  frame-alternation, a "blend two frames for transparency" trick from a
+  console core — the panel holds all of them. If the machine's own display
+  relied on persistence to merge something, the core has to do the merging.
+- **When a picture fault reaches a user, ask for the panel before the next
+  build, and stop the core in the meantime.** The cost of a wrong frame on an
+  OLED is not a wasted flash cycle; it is the user's hardware.
+
+A second, unrelated fault in the same core produced three symptoms that
+looked like three bugs: `video.json` declared `320x224` from the arcade
+template while the core emitted `640x256`. The picture was squished
+horizontally, the bottom 32 lines — where the on-screen keyboard draws — were
+cut off, and the scaler flickered because it had nothing to settle on.
+`tools/check_json.py` reads the window constants out of the RTL and fails if
+`video.json` disagrees, along with the rest of what the Pocket's firmware
+silently refuses.
+
 ---
 
 ## 6. Time Pilot: what changes
