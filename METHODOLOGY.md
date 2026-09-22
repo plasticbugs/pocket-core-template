@@ -1,18 +1,23 @@
 # Building an arcade-accurate openFPGA core
 
-Method, tooling and hard-won lessons from the Xenophobe (Midway MCR-68000)
-core, written to bootstrap Time Pilot. Everything here was learned by doing it
-once; the sections marked **cost me time** are the ones worth reading twice.
+Method, tooling and hard-won lessons from six Analogue Pocket arcade cores.
+Everything here was learned by doing it and getting it wrong first; the
+sections marked **cost me time** are the ones worth reading twice.
 
-§5.8 onward, and the recipes and list items marked the same way, were added
-after the Pleiads / Phoenix core (Amstar, 8085, discrete sound), which was
-built from this document. They are the things it did not yet say.
+The core names in brackets are where a lesson was paid for, and are left as
+they are — a claim about what happened is worth less without the thing it
+happened to. The template's `tools/init_core.py` deliberately does not rename
+them.
 
-§5.16 onward, marked *(My Core)*, were added after the Master of
-Weapon core (Taito B System: 68000, Z80, YM2203, TC0180VCU), built from this
-document in turn. Its simulation was green for days before it met a Pocket, and
-its first four hardware runs found four faults no bench had shown. Those
-sections are about that gap.
+* **Xenophobe** (Midway MCR, 68000) — the original document.
+* **Time Pilot**, **Gaiapolis**, **Cadash** — along the way.
+* **Pleiads / Phoenix** (Amstar, 8085, discrete sound) — §5.8 onward, and the
+  recipes and list items marked the same way. Two games in one core, told
+  apart by a checksum, which is how §5.8 came to be written.
+* **Master of Weapon** (Taito B System: 68000, Z80, YM2203, TC0180VCU) —
+  §5.16 onward. Its simulation was green for days before it met a Pocket, and
+  its first four hardware runs found four faults no bench had shown. Those
+  sections are about that gap, and the template was cut from it afterwards.
 
 ---
 
@@ -52,7 +57,7 @@ against it constantly.**
 | MAME (`brew install mame`) | Oracle | `-video none -sound none -nothrottle -skip_gameinfo`, always `-cfg_directory`/`-nvram_directory` somewhere disposable, and the four flags below that keep it off the screen |
 | MAME Lua (`-autoboot_script`) | Instrumentation | `install_write_tap`, `register_frame_done`, `ioport` fields, `machine.video:snapshot()`, `-wavwrite` |
 | Verilator | RTL simulation | Fast enough for whole-frame and whole-second simulations |
-| Quartus 18.1 in Docker | Synthesis | `raetro/quartus:pocket` — Marcus Andrade's image; `--platform linux/amd64` on Apple silicon |
+| Quartus 18.1 in Docker | Synthesis | `raetro/quartus:pocket`, `--platform linux/amd64` on Apple silicon |
 | Ghidra (optional, via MCP) | Disassembly | Only as far as needed to answer specific questions |
 | Python 3 | Everything else | Reference renderer, image diffing, ROM building, audio analysis. No numpy needed |
 
@@ -303,16 +308,16 @@ and 171,930 bytes, which is a quick check that a file is what it claims to be;
 decode it to a PNG and look at it before shipping it.
 
 **The aspect ratio in `video.json` describes the raster before the scaler
-rotates it** *(My Core; Time Pilot found it first)*. With a `rotation`
+rotates it** *(Master of Weapon; Time Pilot found it first)*. With a `rotation`
 of 90 or 270 the shape that reaches the panel is `aspect_h:aspect_w`. A vertical
 game written the intuitive way round, `3:4`, comes out landscape. A mode that
 fills the Pocket's 10:9 panel is written `9:10`.
 
-**Do not list the d-pad in `input.json`** *(My Core)*. The Pocket's
+**Do not list the d-pad in `input.json`** *(Master of Weapon)*. The Pocket's
 controls menu showed "Up" and three blank rows. The core reads the pad from
 `cont1_key` whether or not it is listed; list only what is worth remapping.
 
-**`pause_core` is not a reset** *(My Core and Cadash)*. It is the
+**`pause_core` is not a reset** *(Master of Weapon and Cadash)*. It is the
 Pocket's menu being open. ORed into the core's reset it holds the board in
 reset for as long as the menu is up and boots the game from scratch when it
 closes. Freeze the clock-enable divider instead and mask the CPU and sound
@@ -322,13 +327,13 @@ running and the picture stays up behind the menu. Note what else counts
 wall-clock time while the CPU is stopped — a watchdog will expire.
 
 **Every menu entry is a claim that the gateware does something**
-*(My Core)*. The DIP bank was transcribed whole from MAME, including
+*(Master of Weapon)*. The DIP bank was transcribed whole from MAME, including
 Cabinet and Flip Screen, which on this board both come down to a video-chip
 bit the core never implemented. Toggle each entry on hardware once and watch
 for its effect; remove what has none, or what has one nobody holding a Pocket
 wants.
 
-**Copying to the SD card from macOS** *(My Core)*: use `cp -X` with
+**Copying to the SD card from macOS** *(Master of Weapon)*: use `cp -X` with
 `COPYFILE_DISABLE=1`, or the card fills with `._*` AppleDouble files. If you
 clean them up afterwards, name the files; a `find -delete` aimed at
 `Platforms/` sweeps every other core's as well.
@@ -356,14 +361,14 @@ infer byte enables in Quartus and explode into registers. Use 2D-packed
   depth, and it swallowed the package's asset folder and both directories of
   captured reference states. CI failed or skipped for the project's first ten
   pushes as a result. Write `/pleiads/` and `/*.bin`.
-- *(My Core)* **A rebuild is never byte-identical, even when the fit
+- *(Master of Weapon)* **A rebuild is never byte-identical, even when the fit
   is.** The same container and the same source gave the same slack to three
   decimals on my machine and in CI, every time — and a different bitstream,
   because the framework stamps the date, the time and a random id into
   `build_id.mif` on every compile. So "CI rebuilt it and timing passed" is a
   twin of the binary you tested, not that binary. I released twins twice here;
   the first bullet of this section is still the right rule.
-- *(My Core)* **Because the fit is deterministic, never push to find
+- *(Master of Weapon)* **Because the fit is deterministic, never push to find
   out whether timing closed.** A local compile answers the same question with
   the same numbers, and can be interrogated with `quartus_sta` afterwards.
   Eleven CI runs were spent learning what local builds would have said.
@@ -579,7 +584,7 @@ impressions. "No intro tune, silent, then just beeps" is not "the audio is
 bad"; it names which generator is absent and which is present. §8 item 9 says
 to believe the report. Also *parse* it.
 
-### 5.16 The platform's memory glue is part of the machine, and needs its own bench *(My Core)*
+### 5.16 The platform's memory glue is part of the machine, and needs its own bench *(Master of Weapon)*
 
 **Cost me the first hardware run, and would have cost a week without a sibling
 core to diff against.** The whole-machine bench answered the CPUs from plain
@@ -615,7 +620,7 @@ What generalises:
   memory module before its download fix. When you fix something in a file that
   was copied, grep the siblings for the same line the same day.
 
-### 5.17 A shared port's acknowledge must say whose it is *(My Core)*
+### 5.17 A shared port's acknowledge must say whose it is *(Master of Weapon)*
 
 Tilemap RAM was one SRAM port shared by the 68000 and the line renderer. The
 port answered with a single ack pulse, decided the clock *before* it was
@@ -641,7 +646,7 @@ the whole diagnosis — it said "caused by CPU activity" in one sentence.
 - **"It stops when X is paused" is a bisection.** Give the user a way to freeze
   half the machine (the menu pause does it for free) and ask what changes.
 
-### 5.18 Prefer structures that can only be synthesised one way *(My Core)*
+### 5.18 Prefer structures that can only be synthesised one way *(Master of Weapon)*
 
 The two line buffers were `logic [11:0] linebuf [0:1][0:319]` — a
 two-dimensional, non-power-of-two array, which became 7,000 flops, a 640-way
@@ -668,7 +673,7 @@ I never proved why. The replacement was one 1024-entry RAM addressed
   the white bar's pixels standing as comb teeth in cells the bar never touches.
   Ask for the test pattern first.
 
-### 5.19 An instrument must survive the event it measures *(My Core)*
+### 5.19 An instrument must survive the event it measures *(Master of Weapon)*
 
 The line renderer reported how many clocks its slowest line took. It restarted
 at every line start whether or not it had finished — and the restart reset the
@@ -685,7 +690,7 @@ on another day. I built a theory on those two numbers and a fix on the theory.
   *ask what the instrument does at the moment of the failure it is there to
   catch.*
 
-### 5.20 Interface timing is a balance, and the report you did not read is the one that matters *(My Core)*
+### 5.20 Interface timing is a balance, and the report you did not read is the one that matters *(Master of Weapon)*
 
 CI failed eleven times on setup slack. I spent most of them pipelining
 arithmetic in the sprite engine, because that is where the failing paths had
@@ -716,7 +721,7 @@ for days.
   the build. It is the converse of §5.11: there, the constraint covered more
   than you meant; here, it covered nothing.
 
-### 5.21 A bring-up panel, designed to be read by a person *(My Core)*
+### 5.21 A bring-up panel, designed to be read by a person *(Master of Weapon)*
 
 §8 item 7 says to add the overlay early. This is what it needed once someone
 was reading it to me square by square, off a picture the scaler had rotated.
@@ -747,7 +752,7 @@ was reading it to me square by square, off a picture the scaler had rotated.
   "the CPU is not halted" into "the CPU dies within three kicks of boot".
 - Leave all of it in the gateware for release, and take it off the menu.
 
-### 5.22 When the fix changes nothing, the theory is dead — say so *(My Core)*
+### 5.22 When the fix changes nothing, the theory is dead — say so *(Master of Weapon)*
 
 I fixed the striped picture twice before I fixed it. The first fix (fetch
 graphics in bursts, so lines finish in time) was well reasoned, verified in
@@ -773,135 +778,85 @@ nothing.
   The "wrong" read-back was correct; my expectation used a region base that was
   never in the design.
 
-### 5.23 The panel is not a CRT, and burn-in is permanent *(BBC Micro)*
-
-A BBC Micro core shipped a picture that alternated between two images at
-25 Hz. The user reported "a 60Hz vertical jitter, almost like looking at a
-CRT — the flicker is in the onscreen text", and by the time it was diagnosed
-it had left a **visible ghost on their Pocket's OLED**. That one faded after
-a few hours of other games — it was image retention, not burn-in — but OLED
-wear is cumulative and the margin between the two is exposure. Nothing else
-in this document risks the reader's hardware at all.
-
-The cause was honest emulation. The machine's CRTC is programmed for
-interlace sync and video, so the field number becomes the low bit of the
-scanline address and one field's vsync is delayed by half a line
-(`RA <= line_counter(4 downto 1) & odd_field`). Alternate frames genuinely
-draw different scanlines of every character from a different vertical
-origin. A CRT's phosphor and a viewer's eye merge the two fields; that is
-what interlace is *for*. A fixed-pixel panel fed one field per frame merges
-nothing, and an OLED fed the difference forever keeps it.
-
-Every gate this project had passed. Frames matched MAME. The memory gate
-passed, timing closed, the frozen states agreed. **No bench had ever compared
-one frame with the next one** — every comparison was against an emulator's
-frame or against another run's frame *at the same time*, which is exactly the
-comparison that cannot see an alternation.
-
-- **Compare consecutive frames of a still picture, before the first flash.**
-  `tools/check_frames.py` does it: neighbours differing while frames two apart
-  are identical is an alternation, and it exits non-zero. Three frames of a
-  boot screen is enough. Put it in the pre-flash list beside `run_mem.sh`.
-- **A user saying "like a CRT" is naming the mechanism, not reaching for a
-  simile.** Interlace shimmer looks like interlace shimmer. Parse it as a
-  diagnosis (5.15).
-- **Do not stop emulating interlace — stop alternating.** Keep the geometry
-  the machine asks for, ten scanlines a row and 312 lines at 50 Hz, and draw
-  the *same* field every frame. In the vendored `mc6845` that is three lines:
-  hold `odd_field` at zero, always select the even field's vsync, and let a
-  new frame start every field instead of every second one.
-- **Any output that alternates is a burn-in risk, not only interlace.** A
-  dither that toggles per frame, a flashing cursor implemented as
-  frame-alternation, a "blend two frames for transparency" trick from a
-  console core — the panel holds all of them. If the machine's own display
-  relied on persistence to merge something, the core has to do the merging.
-- **When a picture fault reaches a user, tell them to stop running the core
-  before the next build.** The cost of a wrong frame on an OLED is not a
-  wasted flash cycle, and the fix arriving twenty minutes later is twenty
-  minutes of exposure that did not need to happen.
-
-A second, unrelated fault in the same core produced three symptoms that
-looked like three bugs: `video.json` declared `320x224` from the arcade
-template while the core emitted `640x256`. The picture was squished
-horizontally, the bottom 32 lines — where the on-screen keyboard draws — were
-cut off, and the scaler flickered because it had nothing to settle on.
-`tools/check_json.py` reads the window constants out of the RTL and fails if
-`video.json` disagrees, along with the rest of what the Pocket's firmware
-silently refuses.
-
 ---
 
-## 6. Time Pilot: what changes
+## 6. Sizing the board: what changes the plan
 
-From `mame -listxml timeplt`:
+Read these off `mame -listxml <set>` and the driver before writing anything.
+Each one moves the work substantially.
 
-| | Xenophobe | Time Pilot |
-|---|---|---|
-| Main CPU | 68000 @ 7.72 MHz | **Z80 @ 3.072 MHz** |
-| Sound CPU | 68000 @ 8 MHz | **Z80 @ 1.789772 MHz** |
-| Sound | software DAC (10-bit) | **2× AY-3-8910A @ 1.789772 MHz** + RC filters |
-| Display | 512×480 | **256×224, rotated 90°**, 60 Hz |
-| ROM total | 832 KB | **53 KB** |
+**Total ROM size against ~400 KB of block RAM.** This is the biggest fork in
+the road. A board whose ROMs fit entirely in BRAM needs no SDRAM at all — and
+with it goes the arbiter, the fetch latency, the bandwidth budget, the
+download FIFO and a whole class of first-hardware-run faults (§5.16, §5.17).
+Every access becomes single-cycle and deterministic. **If it fits, do it**, and
+delete the SDRAM clients from `<core>_mem.sv` rather than leaving them unused.
+A 1.6 MB board has no choice; a 53 KB board would be foolish to use SDRAM.
 
-**The big simplification: 53 KB fits entirely in block RAM.** The Cyclone V
-5CEBA4 has ~393 KB. That removes SDRAM completely — and with it the arbiter, the
-fetch latency, the sprite bandwidth budget, and the sound-CPU starvation that
-between them accounted for most of the Xenophobe effort. Load everything into
-BRAM at startup and every access is single-cycle and deterministic. **Do this.**
+**The CPUs.** Use a proven core: fx68k (68000), T80 or tv80 (Z80), and so on.
+Write one only if none exists, and then write it against MAME's cycle table
+with a bus-trace bench as its test (§5.12). Vendor with `tools/vendor.sh` and
+record it in `modules/VENDOR.md`.
 
-What to expect instead:
+**What paces the audio.** A board with a real sound chip takes its tempo from
+that chip's own clock, so §5.3's starvation trap does not apply — but §5.4
+does, because its output still crosses into the Pocket's audio domain. A board
+with a software DAC on a CPU is the opposite: the CPU's cycle budget *is* the
+tempo, and losing a few percent of it is audible. Find out which you have
+before designing the memory system.
 
-- **Z80 core**: T80 is the standard choice, widely used and well proven.
-- **AY-3-8910**: use a proven implementation (jt49 or similar) rather than
-  writing one. Real chips, so tempo comes from the chip's own clock, not CPU
-  speed — §5.3 does not apply, but §5.4 very much does: the AY outputs still
-  cross into the Pocket's audio domain.
-- **PROMs**: `timeplt.b4`/`b5` (32 bytes) are colour PROMs, `e9`/`e12` (256
-  bytes) lookup PROMs. Palette and tile/sprite colour resolution go through
-  these — model them in the reference renderer first.
-- **Rotation**: the Pocket handles rotated displays, but confirm the orientation
-  and scaling early. It affects how you compare against MAME snapshots.
-- **RC filters**: MAME models them explicitly. Read the coefficients from the
-  driver rather than approximating — Xenophobe's three one-pole sections stood in
-  for a five-pole design and left the output measurably darker in the passband
-  and leakier above it.
+**Colour PROMs.** Many boards resolve palette and tile/sprite colour through
+small PROMs. Model them in the reference renderer first; they are a common
+source of "the picture is right but every colour is wrong".
 
-Suggested order: ROM builder → reference renderer (with PROM colour resolution)
-→ tilemap → sprites → frozen-state gate → Z80 + memory map → AY sound → platform
+**Rotation.** A vertical monitor is normal in arcade hardware and the Pocket
+handles it, but settle the orientation early: it changes how you compare
+against MAME's snapshots, and the aspect ratio in `video.json` describes the
+raster *before* the scaler rotates it (§5.5).
+
+**Explicit filters.** Where MAME models RC filters, read the coefficients from
+the driver rather than approximating. Standing three one-pole sections in for
+a five-pole design left one core measurably darker in the passband and leakier
+above it.
+
+A workable order for most boards: ROM builder → reference renderer → tilemaps
+→ sprites → frozen-state gate → CPU and memory map → sound → platform
 integration → hardware.
 
 ---
 
-## 7. Worth copying from the Xenophobe repo
+## 7. What the template already gives you
+
+Built in, working, and checked — so none of it has to be written again or
+fetched from another repository.
 
 | Path | What it does |
 |---|---|
-| `tools/render_model.py` | Reference renderer + diff against MAME snapshot |
-| `tools/diff_frames.py` | Pixel diff with per-cell hotspots and a visual diff image |
-| `tools/regress_video.sh` | Runs every frozen state through the RTL and checks for zero differences |
-| `tools/mra_build.py` | MRA interpreter; builds the ROM from a MAME zip, CRC-checked |
-| `tools/cut-release.sh` | Publishes a release from a named CI run's bitstream |
-| `tools/fetch_build.sh` | Stages and verifies a CI build before replacing an SD package |
-| `sim/run_video.sh` | Frozen-state video bench (~30 s) |
-| `sim/tb_audio.sv` | Measures the Pocket audio filter chain's gain |
-| `.github/workflows/compile.yml` | Quartus in Docker, artifact upload, tag-triggered release |
-| `target/pocket/core_top.sv` | APF integration, diagnostic overlay, audio CDC |
+| `rtl/<core>_core.sv` | the skeleton machine: raster, test pattern, cursor, beep, one read per ROM region. Replace its inside; keep its ports |
+| `rtl/clk_enables.sv` | CPU/sound/dot enables, with the pause that freezes the machine and leaves the picture up (§5.5) |
+| `rtl/dbg_overlay.sv` | the bring-up panel: four rows of 32 squares, alignment marker first (§5.21) |
+| `rtl/dbg_fault.sv` | first-fault capture — the first exception vector a healthy run never fetches, and where it was |
+| `target/pocket/core_top.sv` | APF glue, SRAM self-test before reset, panel wiring, audio clock-domain hand-over (§5.4) |
+| `target/pocket/<core>_mem.sv` | SDRAM clients, the download FIFO that a non-stallable loader needs (§5.16), the burst arbiter, the SRAM port |
+| `target/pocket/sdram_ctrl.sv`, `sram_port.sv` | the controllers, proven on hardware |
+| `projects/*.sdc` | the constraints, and how to set the SDRAM capture phase (§5.20) |
+| `projects/report_worst.tcl` | worst paths at every corner, setup *and* fast-corner hold |
+| `sim/run_mem.sh` | the memory gate: an image through the download port at the loader's rate and back out (§5.16) |
+| `sim/run_system.sh` | the whole machine through the real memory glue — the bench two cores shipped without |
+| `sim/lint.sh` | every module linted alone, with a waiver file built to match the installed Verilator |
+| `sim/sdram_model.sv`, `sram_model.sv` | behavioural chips beyond the pins |
+| `tools/mra_build.py` | MRA interpreter; builds and CRC-checks the ROM image |
+| `tools/diff_frames.py` | pixel diff with per-cell hotspots — the shape of the error usually names the mistake |
+| `tools/compare_audio.py` | peak, RMS, correlation and band energy across a whole capture (§5.9) |
+| `tools/check-no-roms.sh` | refuses to let ROM data be committed, and aborts rather than passing when it cannot check |
+| `tools/cut-release.sh` | publishes the bitstream a named CI run produced, not a fresh compile (§5.6) |
+| `tools/vendor.sh` | fetches a vendored CPU or sound core from its upstream, pinned |
+| `tools/examples/` | worked tools from a shipped core, as patterns for the ones only you can write |
+| `.github/workflows/compile.yml` | lint, compile, **every constraint applied**, timing closed, package, tag-triggered release |
 
-And from the Pleiads / Phoenix repo:
-
-| Path | What it does |
-|---|---|
-| `tools/bus_trace.lua`, `tools/diff_bus.py`, `tools/check_cycles.py` | CPU held to MAME per bus transaction and per instruction cycle count |
-| `sim/tb_system.cpp` | One bench, three modes: bus trace, end-to-end frames, and whole-core audio with a command log; loads the ROM with the Pocket's real strobe timing |
-| `tools/compare_audio.py` | Peak, RMS, correlation, and band energy per second over the whole capture |
-| `tools/plot_audio.py` | Waveform over spectrogram as a PNG, no numpy |
-| `tools/gen_recip.py --check` | Reciprocal-multiply constants, verified exhaustively over the real operand range |
-| `tools/reverb_model.py`, `sim/run_reverb.sh` | Bit-exact model of the shared cabinet reverb, and the bench that holds the RTL to it and counts samples at the rails |
-| `tools/make_report.py` | The page the user watches: every state's picture and diff, audio players, the metric used for each |
-| `rtl/i8085.sv` | An 8085 written against MAME's cycle table, with the bus-trace bench as its test |
-
-The platform directory (`platform/pocket/`) and the APF framework transfer
-wholesale; only `core_top.sv` and the `rtl/` contents are game-specific.
+What is *not* here, because only the board can say: the reference renderer, the
+frozen-state video bench, the MAME state dumper, and the RTL of the machine
+itself. `tools/examples/` holds one core's versions of the first three.
 
 ---
 
@@ -938,7 +893,7 @@ Added after Pleiads / Phoenix:
 17. Publish the simulator's output where the user can hear it next to the
     hardware. It bisects.
 
-Added after My Core:
+Added after Master of Weapon:
 
 18. Build the second whole-machine bench — real memory glue, behavioural
     chips, the image pushed at the loader's real rate — before the first

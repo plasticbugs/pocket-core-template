@@ -51,7 +51,9 @@ from the last of them.
 ## When you add to this
 
 Vendored CPU and sound cores (`modules/`) are recorded in `modules/VENDOR.md`
-with their upstream, licence and the sibling core they came through. Keep that
-table filled in as you vendor them, and name their authors in the core's
-README. Never strip a licence header from a file you copy — the SPDX headers
+with their upstream, exact commit and licence — `tools/vendor.sh` prints the
+row to paste. Keep that table filled in as you vendor them, and name their
+authors in the core's README: fx68k is Jorge Cwik's, tv80 Guy Hutchison's, the
+jt-series sound chips Jose Tejada's, and they are the reason a core can exist
+at all. Never strip a licence header from a file you copy — the SPDX headers
 in `platform/` and `modules/` are the licence, not decoration.

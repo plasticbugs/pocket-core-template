@@ -39,17 +39,19 @@ until it is checked, and commit at each one.
    hands the chips. Set the region bases in
    `target/pocket/mycore_mem.sv` and `sim/tb_mem.cpp` to match, and run
    `sim/run_mem.sh`.
-4. **The reference renderer** (`tools/`), pixel-identical to MAME on captured
-   frames that span boot, attract, gameplay and any special mode. Expect to get
+4. **The reference renderer** — a Python model of the video hardware, in
+   `tools/`, pixel-identical to MAME on captured frames that span boot, attract, gameplay and any special mode. Expect to get
    bit-plane order, scroll sign and frame alignment wrong once each.
 5. **Video RTL against frozen states** — a bench that loads a dumped state and
    diffs palette indices against the renderer. Zero differing pixels, then
    measure the line and sprite budgets against a real memory latency.
 6. **CPUs, then the whole machine** on the fast bench with ideal memories.
-7. **The whole machine on the real memory glue** (`sim/run_pocket.sh` in the
-   Master of Weapon core is the model): real `mycore_mem`, real SDRAM
-   controller, behavioural chips, image pushed at the loader's rate. Do this
-   *before the first flash*.
+7. **The whole machine on the real memory glue** — `sim/run_system.sh`, which
+   is in this template and already runs against the skeleton: real
+   `mycore_mem`, real SDRAM controller and SRAM port, behavioural chips beyond
+   the pins, image pushed in at the loader's rate. Keep the fast
+   ideal-memory bench too, but this is the one to pass *before the first
+   flash*.
 8. **Sound**, compared with a MAME recording by band energy over a whole
    capture.
 9. **Hardware.** Flash, and read `docs/bringup.md` with the person holding the
@@ -94,7 +96,7 @@ until it is checked, and commit at each one.
 |---|---|---|
 | The Pocket's loader cannot wait; a single pending download word corrupts the image | 64-word FIFO, edge-detected strobe, in `mycore_mem.sv`; `sim/run_mem.sh` fails without it | 5.16 |
 | The write strobe is held 4 clocks; anything that counts on its level is wrong | the gate's `-hold` | 5.8 |
-| A shared port's ack carries no name | route by who held the mux the clock before (see Master of Weapon's `tc0180vcu.sv` arbiter) | 5.17 |
+| A shared port's ack carries no name | latch the owner at grant; route the ack by it, never by who is asking when it lands | 5.17 |
 | 2-D or non-power-of-two arrays of flops | one-dimensional, power-of-two RAMs only | 5.18 |
 | The menu-open signal wired into reset | `pause` freezes `clk_enables.sv`; video keeps running | 5.5 |
 | DIP register rewritten on menu close | `interact.sv` resets only on a changed value | 5.5 |
@@ -128,7 +130,8 @@ projects/                               Quartus project, SDC, report_worst.tcl
 platform/pocket/                        OpenGateware's gateman-pocket (Marcus Andrade) — leave alone
 pkg/pocket/                             what goes on the SD card (never a ROM)
 sim/lint.sh                             every module linted on its own
-sim/run_mem.sh                          THE MEMORY GATE — run before the first flash
+sim/run_mem.sh                          the memory gate: an image in at the loader's rate, and back out
+sim/run_system.sh                       the whole machine through that same glue — pass before flashing
 tools/                                  MAME wrappers, ROM builder, pixel diff, ROM guard, release
 tools/examples/                         game-specific tools from Master of Weapon, as patterns
 build-local.sh  package-pocket.py       Quartus 18.1 in Docker; the SD-card package
@@ -145,6 +148,8 @@ tools/check_frames.py artifacts/still -w W -h H   # THREE CONSECUTIVE frames of 
                              # ghost on the Pocket's OLED -- before the first flash
 tools/check_json.py pkg/pocket --active WxH       # what the firmware silently refuses
 sim/run_mem.sh -quick        # a minute; after touching mycore_mem.sv (drop -quick before a flash)
+sim/run_system.sh -frames 10 # the whole machine through the real memory glue
+tools/vendor.sh              # list the CPU and sound cores it can fetch from upstream
 ./build-local.sh map         # two minutes; catches what Verilator cannot
 ./build-local.sh compile     # 10-25 minutes; then read projects/output_files/*.sta.summary
 docker run --rm --platform linux/amd64 -v "$PWD":/build -w /build \

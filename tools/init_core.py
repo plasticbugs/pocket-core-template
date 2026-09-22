@@ -45,6 +45,11 @@ def main():
             p = os.path.join(dp, fn)
             if os.path.abspath(p) == os.path.abspath(__file__):
                 continue
+            # METHODOLOGY and CREDITS name the cores a lesson was paid for on
+            # and the people whose work this sits on.  Renaming those to the
+            # new core would turn provenance into a false claim.
+            if fn in ('METHODOLOGY.md', 'CREDITS.md'):
+                continue
             if not fn.endswith(BINARY):
                 try:
                     t = open(p).read()
