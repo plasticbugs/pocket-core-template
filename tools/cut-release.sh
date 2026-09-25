@@ -1,11 +1,13 @@
 #!/bin/sh
 # Publish a release built from a specific, hardware-verified CI build.
 #
-# Usage: cut-release.sh <tag> <run-id>
+# Usage: cut-release.sh <tag> <run-id | bitstream.rbf_r>
 #        cut-release.sh v1.0.0 32214080417
+#        cut-release.sh v1.0.0 release/pocket/Cores/<id>/bitstream.rbf_r
 #
-# Takes the bitstream from that run rather than recompiling, so the release
-# ships the exact gateware that was tested on hardware. Everything outside the
+# Takes the bitstream from that CI run, or the local file that was flashed,
+# rather than recompiling, so the release ships the exact gateware that was
+# tested on hardware. Everything outside the
 # bitstream (JSON definitions, platform image, ROM recipe, README) comes from
 # the working tree, which is how a definition-only change can be released
 # without a rebuild.
@@ -29,8 +31,16 @@ fi
 STAGE=$(mktemp -d)
 trap 'rm -rf "$STAGE"' EXIT
 
-echo "fetching bitstream from run $RUN ..."
-gh run download "$RUN" -D "$STAGE" || { echo "download failed"; exit 1; }
+if [ -f "$RUN" ]; then
+    # a local bitstream: the one that was put on the card and tested
+    echo "bitstream from $RUN (md5 $(md5 -q "$RUN" 2>/dev/null || md5sum "$RUN" | cut -d' ' -f1))"
+    cid=$(basename "$(ls -d pkg/pocket/Cores/*/ | head -1)")
+    mkdir -p "$STAGE/local/$cid"
+    cp "$RUN" "$STAGE/local/$cid/bitstream.rbf_r"
+else
+    echo "fetching bitstream from run $RUN ..."
+    gh run download "$RUN" -D "$STAGE" || { echo "download failed"; exit 1; }
+fi
 # The run ships one bitstream per core, each under its own Cores/<id>/ folder.
 CORES=$(find "$STAGE" -name 'bitstream.rbf_r' -exec dirname {} \; | xargs -n1 basename | sort -u)
 [ -n "$CORES" ] || { echo "no bitstream in run $RUN"; exit 1; }
@@ -66,9 +76,9 @@ for c in $CORES; do
     done
     plat=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['core']['metadata']['platform_ids'][0])" \
            "$OUT/Cores/$c/core.json")
-    for f in "Platforms/$plat.json" "Platforms/_images/$plat.bin"; do
-        [ -e "$OUT/$f" ] || { echo "package missing $f"; exit 1; }
-    done
+    [ -e "$OUT/Platforms/$plat.json" ] || { echo "package missing Platforms/$plat.json"; exit 1; }
+    # the platform image is the user's to supply (CLAUDE.md); the core works without it
+    [ -e "$OUT/Platforms/_images/$plat.bin" ] || echo "note: no Platforms/_images/$plat.bin (none supplied yet)"
 done
 for j in "$OUT"/Cores/*/*.json "$OUT"/Platforms/*.json; do
     python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$j" || { echo "bad json: $j"; exit 1; }
@@ -78,7 +88,11 @@ if find "$OUT" -name '*.rom' | grep -q .; then
 fi
 
 VER=$(python3 -c "import json;print(json.load(open('pkg/pocket/Cores/plasticbugs.mycore/core.json'))['core']['metadata']['version'])")
-ZIP="$PWD/mcr68-pocket-sdcard.zip"
+# names from the package, so a core made from the template never ships
+# another core's (this line once named MCR-68000 in NBA Jam's release)
+SHORT=$(python3 -c "import json,glob;print(json.load(open(sorted(glob.glob('pkg/pocket/Cores/*/core.json'))[0]))['core']['metadata']['shortname'])")
+TITLE=$(python3 -c "import json,glob;print(json.load(open(sorted(glob.glob('pkg/pocket/Platforms/*.json'))[0]))['platform']['name'])")
+ZIP="$PWD/$SHORT-pocket-sdcard.zip"
 rm -f "$ZIP"
 (cd "$OUT" && zip -qr "$ZIP" .)
 echo "package $VER, zip $(wc -c < "$ZIP") bytes"
@@ -87,7 +101,7 @@ for c in $CORES; do
 done
 
 gh release create "$TAG" \
-    --title "MCR-68000 for Analogue Pocket $TAG" \
+    --title "$TITLE for Analogue Pocket $TAG" \
     --notes-file docs/release-notes.md \
     "$ZIP"
 rm -f "$ZIP"
