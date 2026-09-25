@@ -391,10 +391,39 @@ existing tools work) plus a dependency-free Python builder that reads the MAME
 zip directly, checks each CRC, and verifies the finished image against a known
 checksum.
 
-MRA's `map` attribute: each digit is one byte of the output word, left to right;
-the value is the 1-based byte of the input part. Verify against a known-good
-reference — in MAME's `f1dreama` the even-offset ROM carries `map="10"`, which
-establishes that the left digit is the first byte of the word.
+**MRA's `map` attribute is read right to left** *(corrected after NBA Jam)*:
+each digit is one byte of the output word, the **rightmost digit the word's
+first byte**, and its value is the 1-based byte of the input part that lands
+there, 0 for none. That is how mra-tools-c, the standard tool, reads it
+(`get_pattern_from_map` walks the string from the end, and it sorts parts by
+that position, so their order in the file does not matter).
+
+This document used to say *left to right*, inferred from one MRA's `map="10"`
+on an even-offset ROM, and every core built from it followed: its
+`mra_build.py` read maps left to right and its `.mra` files were written to
+match. Both agreed with each other, so every image verified -- and the
+standard tool, which is what the people who build ROMs for the updaters use,
+built a scrambled image from every core that interleaves (bytes reversed in
+each word), with only an "md5 mismatch" warning. A user reported it; the fix
+touched eleven cores.
+
+- **Build the image with both tools** and require the same md5:
+  `tools/check_mra.py <romdir>` does it for every `.mra`. An inference about
+  a format is not the format; the other implementation is the check.
+- **An `<interleave>` must fill the whole output word.** mra-tools-c has no
+  padding: 32-bit words from three byte-wide ROMs are an error there
+  ("interleaved group width do not match total bytes"), and a filler part
+  inside an interleave cannot use `repeat`. Lay the image out so every byte of
+  a word comes from a ROM (Smash TV's graphics words carry a zero byte, so its
+  `.mra` still needs `mra_build.py`).
+- **Merged romsets keep clones' same-named files in subdirectories** (MAME's
+  `sldh`): `nbajamte.zip` holds the parent's `ug12` and, in `nbajamte4/`, the
+  clone's. Pick files by CRC, not by bare name -- mra-tools-c tries the CRC
+  first, and `mra_build.py` now does too. Test with a merged-style zip.
+- `crc="a|b"` (either dump) is standard; `md5="a|b"` is not -- mra-tools-c
+  warns on it, though it builds the right image.
+- Name the output after `<setname>` (the standard tool does), and make those
+  the names the core's instance JSONs give the updaters.
 
 ### 5.8 The bench must talk to the core the way the platform does
 

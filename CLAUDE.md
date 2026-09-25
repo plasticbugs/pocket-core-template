@@ -34,7 +34,8 @@ until it is checked, and commit at each one.
    Ghidra on the program ROM for anything the driver leaves implicit. No RTL
    yet.
 3. **The ROM image.** Write `mycore.mra`, build the image with
-   `tools/mra_build.py`, and write a `tools/verify_rom.py` (the pattern is in
+   `tools/mra_build.py` **and** the standard `mra` tool (`tools/check_mra.py`
+   requires the same md5 from both), and write a `tools/verify_rom.py` (the pattern is in
    `tools/examples/`) that proves every region is byte-identical to what MAME
    hands the chips. Set the region bases in
    `target/pocket/mycore_mem.sv` and `sim/tb_mem.cpp` to match, and run
@@ -111,6 +112,7 @@ until it is checked, and commit at each one.
 | `interact.json` the firmware refuses with "General Error" | `tools/check_json.py`; ids unique, `defaultval` is an option INDEX, no value with bit 31 set | 5.23 |
 | A power-on self-test overwriting what the loader just wrote -- and the panel still reading a pass | `sram_selftest.sv` reads its two words first, writes them back last, and runs after the load | 5.25 |
 | A game list (instance JSONs) flagged by the checker for a slot with no filename | `tools/check_json.py` accepts it when every instance names the file | 5.26 |
+| An `.mra` that only this repo's builder reads correctly (interleave `map` direction, padding bytes, merged sets) | `tools/check_mra.py <romdir>` builds each with `mra_build.py` and the standard `mra` tool and fails if they differ; maps are read right to left | 5.7 |
 | A release zip and title named after another core | `tools/cut-release.sh` reads both from the package; it also takes the flashed bitstream directly | 5.6 |
 
 Not defusable in code -- read these before you meet them:
@@ -170,6 +172,7 @@ tools/vendor.sh              # list the CPU and sound cores it can fetch from up
 ./build-local.sh compile     # 10-25 minutes; then read projects/output_files/*.sta.summary
 docker run --rm --platform linux/amd64 -v "$PWD":/build -w /build \
     raetro/quartus:pocket quartus_sta -t projects/report_worst.tcl   # worst paths, every corner
+tools/check_mra.py <romdir>  # every .mra, built by mra_build.py AND the standard mra tool
 tools/check-no-roms.sh       # before every push
 tools/gen_qip.sh             # after adding a file to rtl/ or modules/
 ```
