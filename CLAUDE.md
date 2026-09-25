@@ -109,6 +109,22 @@ until it is checked, and commit at each one.
 | An interlaced CRTC faithfully alternating fields | keep the geometry, draw the same field every frame | 5.23 |
 | `video.json` declaring a size the core does not emit | `tools/check_json.py --active WxH`; the symptom is three bugs at once | 5.23 |
 | `interact.json` the firmware refuses with "General Error" | `tools/check_json.py`; ids unique, `defaultval` is an option INDEX, no value with bit 31 set | 5.23 |
+| A power-on self-test overwriting what the loader just wrote -- and the panel still reading a pass | `sram_selftest.sv` reads its two words first, writes them back last, and runs after the load | 5.25 |
+| A game list (instance JSONs) flagged by the checker for a slot with no filename | `tools/check_json.py` accepts it when every instance names the file | 5.26 |
+| A release zip and title named after another core | `tools/cut-release.sh` reads both from the package; it also takes the flashed bitstream directly | 5.6 |
+
+Not defusable in code -- read these before you meet them:
+
+- **Moving a data slot moves every slot id in `core_top`**, and the save has a
+  write path *and* a load path; one missed, the file is written and never
+  read back (5.24).
+- **Frame drops do not show in CPU cycles per frame**; count the game's page
+  flips against MAME's (5.27).
+- **On the Pocket, SDRAM burst writes take one word a clock; burst reads may
+  not** -- keep the pace a runtime choice per direction until hardware has
+  chosen, with the tested setting as the all-clear default (5.28).
+- **An emulator's saved settings are hidden state**: give each investigation
+  its own `-cfg_directory` / `-nvram_directory` (5.29).
 
 ## The map
 
@@ -168,5 +184,9 @@ They are your only instrument on hardware, and each reading costs them
 minutes. Before every build say what you expect to change and what reading
 would prove you wrong. Ask for the game's own test pattern (service mode)
 before a photograph of gameplay. Keep `docs/bringup.md` exact, because they
-read the panel from it. Put the build on the SD card only when asked, copy
-with `cp -X`, verify the md5 on the card, and never touch their ROM.
+read the panel from it. Ask once whether they want every build put on the SD
+card as soon as it compiles: some people test on hardware faster than you can
+simulate, and then waiting to be asked costs a round (a test once ran on the
+previous build because the new one was never copied). Copy with `cp -X`,
+remove the `._*` files it still leaves in the folders you wrote, verify the
+md5 on the card, and never touch their ROM.

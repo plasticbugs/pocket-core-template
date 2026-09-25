@@ -1,6 +1,6 @@
 # Building an arcade-accurate openFPGA core
 
-Method, tooling and hard-won lessons from six Analogue Pocket arcade cores.
+Method, tooling and hard-won lessons from the Analogue Pocket cores listed below.
 Everything here was learned by doing it and getting it wrong first; the
 sections marked **cost me time** are the ones worth reading twice.
 
@@ -18,6 +18,13 @@ them.
   §5.16 onward. Its simulation was green for days before it met a Pocket, and
   its first four hardware runs found four faults no bench had shown. Those
   sections are about that gap, and the template was cut from it afterwards.
+* **BBC Micro** — §5.23: a picture that alternated between frames, and the
+  ghost it left on a Pocket's OLED.
+* **Punch-Out!!** and **NBA Jam / Tournament Edition** (Midway T-unit:
+  TMS34010, blitter, 6809 ADPCM sound board) — §5.24 onward: save RAM, a
+  self-test that overwrote the program it was meant to protect, several games
+  in one core, and the memory speed limits the Pocket imposes that no
+  simulation shows.
 
 ---
 
@@ -777,6 +784,202 @@ nothing.
 - **Derive expected values from the constants the RTL uses**, not from memory.
   The "wrong" read-back was correct; my expectation used a region base that was
   never in the design.
+
+### 5.23 The panel is not a CRT, and burn-in is permanent *(BBC Micro)*
+
+A BBC Micro core shipped a picture that alternated between two images at
+25 Hz. The user reported "a 60Hz vertical jitter, almost like looking at a
+CRT — the flicker is in the onscreen text", and by the time it was diagnosed
+it had left a **visible ghost on their Pocket's OLED**. That one faded after
+a few hours of other games — it was image retention, not burn-in — but OLED
+wear is cumulative and the margin between the two is exposure. Nothing else
+in this document risks the reader's hardware at all.
+
+The cause was honest emulation. The machine's CRTC is programmed for
+interlace sync and video, so the field number becomes the low bit of the
+scanline address and one field's vsync is delayed by half a line
+(`RA <= line_counter(4 downto 1) & odd_field`). Alternate frames genuinely
+draw different scanlines of every character from a different vertical
+origin. A CRT's phosphor and a viewer's eye merge the two fields; that is
+what interlace is *for*. A fixed-pixel panel fed one field per frame merges
+nothing, and an OLED fed the difference forever keeps it.
+
+Every gate this project had passed. Frames matched MAME. The memory gate
+passed, timing closed, the frozen states agreed. **No bench had ever compared
+one frame with the next one** — every comparison was against an emulator's
+frame or against another run's frame *at the same time*, which is exactly the
+comparison that cannot see an alternation.
+
+- **Compare consecutive frames of a still picture, before the first flash.**
+  `tools/check_frames.py` does it: neighbours differing while frames two apart
+  are identical is an alternation, and it exits non-zero. Three frames of a
+  boot screen is enough. Put it in the pre-flash list beside `run_mem.sh`.
+- **A user saying "like a CRT" is naming the mechanism, not reaching for a
+  simile.** Interlace shimmer looks like interlace shimmer. Parse it as a
+  diagnosis (5.15).
+- **Do not stop emulating interlace — stop alternating.** Keep the geometry
+  the machine asks for, ten scanlines a row and 312 lines at 50 Hz, and draw
+  the *same* field every frame. In the vendored `mc6845` that is three lines:
+  hold `odd_field` at zero, always select the even field's vsync, and let a
+  new frame start every field instead of every second one.
+- **Any output that alternates is a burn-in risk, not only interlace.** A
+  dither that toggles per frame, a flashing cursor implemented as
+  frame-alternation, a "blend two frames for transparency" trick from a
+  console core — the panel holds all of them. If the machine's own display
+  relied on persistence to merge something, the core has to do the merging.
+- **When a picture fault reaches a user, tell them to stop running the core
+  before the next build.** The cost of a wrong frame on an OLED is not a
+  wasted flash cycle, and the fix arriving twenty minutes later is twenty
+  minutes of exposure that did not need to happen.
+
+A second, unrelated fault in the same core produced three symptoms that
+looked like three bugs: `video.json` declared `320x224` from the arcade
+template while the core emitted `640x256`. The picture was squished
+horizontally, the bottom 32 lines — where the on-screen keyboard draws — were
+cut off, and the scaler flickered because it had nothing to settle on.
+`tools/check_json.py` reads the window constants out of the RTL and fails if
+`video.json` disagrees, along with the rest of what the Pocket's firmware
+silently refuses.
+
+### 5.24 Save RAM: the core writes it, and the load and the write are two paths *(Punch-Out, NBA Jam)*
+
+A nonvolatile data slot is the core's job, not the platform's. Five rules,
+each of which cost a hardware round on one core or another:
+
+- **The core issues `target_dataslot_write` itself** — a couple of seconds
+  after the game last touches its battery RAM, when the menu opens, and once a
+  few seconds after loading. The Pocket only writes back a slot it *loaded*, so
+  the exit-time flush can never create the first file.
+- **Put the slot at bridge address `0x20000000`** with its own `data_io`
+  (upper-nibble mask 2) and its own unloader. `0x10000000` hangs the load the
+  moment a file exists.
+- **Write the slot's size into the data-slot table**, entry
+  `position * 2 + 1`, where *position* is the slot's place in `data.json`
+  (NBA Jam: game JSON, ROM, save → the save is position 2 → entry 5, and the
+  file appeared). If the entry is zero, nothing is written.
+- **Set parameters bit 5** (initialise-on-load), or a never-loaded slot has no
+  filename for the core's write.
+- Saves land in `Saves/<platform>/<core id>/<filename>`, and reinstalling the
+  core does not touch them.
+
+**A slot's id appears in the RTL more than once, and moving it moves all of
+them.** Adding a game list (§5.26) turns the ROM from slot 0 into slot 1 and
+the save from 1 into 2. In `core_top` that is four places: the ROM loader's
+`ioctl_index` test, the *save loader's* `ioctl_index` test, the table entry,
+and `target_dataslot_id`. NBA Jam moved three. The save file kept being
+written, 16 KB, with the edited settings in it, and every restart came up with
+factory settings, because the loader still took slot 1 and ignored slot 2.
+
+- **Grep for every slot id and every `ioctl_index` comparison** when
+  `data.json` changes. The write path and the load path are separate code and
+  fail separately.
+- **Verify a save on hardware in three steps**, each read off the card: the
+  file exists; its contents differ from the factory image where the change was
+  made (compare it with MAME's own `nvram` for the set); and after quitting
+  and relaunching the core the change is still there. The first two passing
+  and the third failing is exactly the loader bug above.
+
+### 5.25 A power-on self-test must not touch what the loader just wrote *(NBA Jam)*
+
+The template's SRAM self-test writes two words and reads them back before the
+core leaves reset, so a dead SRAM shows on the panel instead of as a silent
+machine. On NBA Jam the SRAM holds the sound CPU's program, which the
+download writes *just before* the test runs. The test's addresses,
+`0x1fffe`/`0x1ffff`, were written for a 17-bit port; this core's port was 16
+bits, so they landed on `0xfffe`/`0xffff` — the last two words of the 6809
+program, its NMI and RESET vectors. The sound CPU started at the test pattern,
+the machine was silent apart from clicks, and **the panel read a pass**,
+because two distinct words did go in and come back out.
+
+- **A test that says "pass" proves only what it looks at.** Here it looked at
+  its own two words, not the program around them.
+- **Put back what the test overwrites**: read the words first, write them back
+  last (`sram_selftest.sv` in Smash TV and NBA Jam). Or test only memory
+  nothing else has filled yet.
+- **Give the test's addresses the port's width**, and check it: a mismatched
+  width truncates silently.
+- **Logic that lives only in `core_top` is in no bench.** Move it into a small
+  module the memory gate instantiates, and run it there *in the platform's
+  order* — download, then self-test, then read every byte of what the core
+  will execute. Put the old behaviour back once to see the gate fail on the
+  bytes you expect.
+
+### 5.26 One core, several games: the list, the recognition, and what differs *(Pleiads, Punch-Out, NBA Jam)*
+
+When a family of sets runs on one board (NBA Jam and Tournament Edition),
+**read how MAME tells them apart before planning anything**: here it was one
+init routine with a single switch, changing a protection table and where the
+sound board's hidden RAM sits. That is an afternoon, not a second core.
+
+- **The game list is instance JSONs**: `data.json` slot 0 "Arcade Game"
+  (`json`, parameters `0x113`, no filename), slot 1 the ROM (`0x108`), slot 2
+  the save; one `Assets/<platform>/<core id>/<Game>.json` per game naming its
+  ROM and its save. The Pocket lists the games by name, and updaters fetch every
+  file an instance names. Then see §5.24 for what moves in the RTL.
+- **The core recognises the game from the image as it loads**: sum a region's
+  bytes and compare with the known totals, defaulting to the first game.
+  Count **each byte once** — the loader holds its strobe several clocks, and a
+  sum taken on the level matches nothing (Pleiads' Phoenix played with the
+  wrong sound board for exactly this). Test recognition in the memory gate at
+  strobe holds of 1, 4 and 7.
+- **Re-run the whole method for the second game**, cheaply: its own MRA
+  checked against MAME's regions, its own frozen states through the models and
+  the RTL, the CPU from reset against MAME, and — for protection — every
+  question and answer of its boot logged in MAME and in the bench and diffed.
+  Parametrise the tools by set name early (`GAME=...`); every script that
+  hard-codes the first set's name is a trap for the second.
+
+### 5.27 Count what the game finishes, not what the CPU executes *(NBA Jam)*
+
+"Frame drops when a basket is in view" had no trace in the number we had been
+watching, CPU cycles per frame, which sat at 99%: a CPU waiting for the
+blitter still spends its cycles, busy-polling. The measurement that saw it
+counts **page flips** — writes to the display-start register — per frame, in
+MAME and in the bench over the same stretch of play: MAME flipped on 975
+frames of 1000, the core on 796, and on alternate frames only through the
+busiest scenes, where the blitter was busy 94% of every frame.
+
+- Pick the metric that the symptom lives in. For smoothness it is frames the
+  game completes; for sound it is loudness over time (§5.15); for speed it is
+  how far the timeline has moved against the oracle's.
+- **Run the bench in the configuration the hardware runs.** The first long
+  run used the fast memory setting the Pocket could not use; its numbers were
+  comfortable and irrelevant.
+- The oracle's own count is the baseline: the arcade drops frames too (25 in
+  1000 here). The question is only whether the core drops *more*.
+
+### 5.28 On the Pocket, SDRAM writes and reads have different speed limits *(NBA Jam)*
+
+Bursts at one word a clock were exact in every simulation and garbled the
+palette byte on hardware; one word every two clocks was clean but too slow for
+the busiest scenes. Splitting the pace by direction settled it in one test:
+**writes at one a clock are sound; reads at one a clock are not** (at the
+default capture phase). Writes are most of a blitter's traffic, so fast
+writes with half-rate reads was both clean and smooth.
+
+- **Make a hardware-only speed a runtime choice**, per direction, while it is
+  unproven, so one flash can try every combination. The person holding the
+  Pocket bisects faster than any recompile.
+- **Make the all-clear value of every such switch the tested setting.** Then
+  taking the switches off the release menu changes nothing, and a firmware
+  that never writes a default cannot select an untested mode.
+- A symptom confined to one byte of a word ("colours wrong, shapes right")
+  names the byte lane before it names the cause; say so, and design the next
+  test to split it.
+
+### 5.29 The instrument's hidden state *(NBA Jam)*
+
+Two measurements here were wrong for reasons that had nothing to do with the
+core:
+
+- **A persisted emulator setting.** A service-mode capture left the test
+  switch on in MAME's saved `cfg`; every later run sat in the test menu, and a
+  five-minute census of the blitter reported 457 blits and "zero" of what it
+  was looking for. Give each investigation its own `-cfg_directory` and
+  `-nvram_directory`, and sanity-check a census against a known rate (a busy
+  frame has hundreds of blits) before believing its zero.
+- **A bench that dies on a missing output directory** looks like a bench that
+  ran and found nothing. Create the directory in the bench, or refuse loudly.
 
 ---
 
