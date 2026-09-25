@@ -903,45 +903,25 @@ module core_top
     //! A55A and 5AA5 are chosen to be each other's byte-swap and nibble
     //! inverse, so a stuck bit, a swapped byte lane and a dead bus all read
     //! differently from a pass.
-    localparam logic [15:0] SRAM_T0 = 16'hA55A, SRAM_T1 = 16'h5AA5;
+    //!
+    //! The test is target/pocket/sram_selftest.sv, and it PUTS BACK the two
+    //! words it overwrites: a core that loads anything into the SRAM (NBA
+    //! Jam's sound program) would otherwise have two words of it replaced by
+    //! the test pattern, with the panel still reading a pass (METHODOLOGY
+    //! 5.25).  It runs after the load, and its addresses sit either side of
+    //! the port's top address line (A14 on this 15-bit port).
     wire        cv_req, cv_we, cv_ack;
     wire [14:0] cv_addr;  wire [15:0] cv_din;  wire [1:0] cv_ben;
-    logic [15:0] sram_rd0, sram_rd1;
-    logic  [2:0] sram_st;
-    logic        sram_done, tv_req, tv_we;
-    logic [14:0] tv_addr;
-    logic [15:0] tv_din;
-    // A port that never acknowledges would leave the core in reset for good
-    // and the panel showing nothing but zeros, which looks the same as a
-    // memory that answers wrongly.  Give up after a millisecond instead: the
-    // read-backs stay zero, but the core runs and says so.
-    logic [16:0] sram_tmo;
-
-    always_ff @(posedge clk_sys) begin
-        if (!mem_ready) begin
-            sram_st <= 3'd0; sram_done <= 1'b0; tv_req <= 1'b0; tv_we <= 1'b0;
-            sram_rd0 <= '0; sram_rd1 <= '0; sram_tmo <= '0;
-        end else if (!sram_done) begin
-            sram_tmo <= sram_tmo + 17'd1;
-            if (&sram_tmo) sram_done <= 1'b1;       // ~1.4 ms at 96 MHz
-            case (sram_st)
-                3'd0: begin tv_we <= 1'b1; tv_addr <= 15'h0000; tv_din <= SRAM_T0;
-                            tv_req <= 1'b1; sram_st <= 3'd1; end
-                3'd1: if (vram_ack) begin tv_req <= 1'b0; sram_st <= 3'd2; end
-                3'd2: begin tv_we <= 1'b1; tv_addr <= 15'h0001; tv_din <= SRAM_T1;
-                            tv_req <= 1'b1; sram_st <= 3'd3; end
-                3'd3: if (vram_ack) begin tv_req <= 1'b0; sram_st <= 3'd4; end
-                3'd4: begin tv_we <= 1'b0; tv_addr <= 15'h0000;
-                            tv_req <= 1'b1; sram_st <= 3'd5; end
-                3'd5: if (vram_ack) begin sram_rd0 <= vram_q; tv_req <= 1'b0; sram_st <= 3'd6; end
-                3'd6: begin tv_we <= 1'b0; tv_addr <= 15'h0001;
-                            tv_req <= 1'b1; sram_st <= 3'd7; end
-                3'd7: if (vram_ack) begin sram_rd1 <= vram_q; tv_req <= 1'b0;
-                                          sram_done <= 1'b1; end
-                default: ;
-            endcase
-        end
-    end
+    wire [15:0] sram_rd0, sram_rd1;
+    wire        sram_done, tv_req, tv_we;
+    wire [16:0] tv_addr17;
+    wire [14:0] tv_addr = tv_addr17[14:0];
+    wire [15:0] tv_din;
+    sram_selftest #(.A0(17'h00000), .A1(17'h04000)) u_sramtest (
+        .clk(clk_sys), .hold(!mem_ready || !loaded),
+        .req(tv_req), .we(tv_we), .addr(tv_addr17), .d(tv_din), .ack(vram_ack), .q(vram_q),
+        .done(sram_done), .rd0(sram_rd0), .rd1(sram_rd1)
+    );
 
     assign vram_req  = sram_done ? cv_req  : tv_req;
     assign vram_we   = sram_done ? cv_we   : tv_we;

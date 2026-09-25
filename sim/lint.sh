@@ -51,5 +51,13 @@ if [ -z "$out" ]; then echo ok
 else echo; echo "$out" | sed 's/^/    /'; fail=1
 fi
 
+printf '%-20s ' "sram self-test"
+out=$(verilator --lint-only $OPTS "$WAIVE" --top-module sram_selftest \
+      "$root"/target/pocket/sram_selftest.sv 2>&1 \
+      | grep -E '^%(Error|Warning)' | grep -v 'Exiting due to' || true)
+if [ -z "$out" ]; then echo ok
+else echo; echo "$out" | sed 's/^/    /'; fail=1
+fi
+
 [ $fail = 0 ] || exit 1
 echo "lint clean"
