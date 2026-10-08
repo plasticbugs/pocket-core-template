@@ -73,6 +73,23 @@ Row 2 proves the path, not the image; `sim/run_mem.sh` proves the image.
 | glitches only while playing, gone in the menu | something the CPU shares with the video; section 5.17 |
 | menu restarts the game | `pause` has reached a reset; section 5.5 |
 
+## With an Analogizer
+
+Only once the core itself is healthy on the Pocket's screen, and in this
+order -- each step's reading tells the next where to look
+(docs/analogizer.md):
+
+1. **No `analogizer.bin` on the card.**  The core must play exactly as
+   without the adapter.  If it does not, the cart port is not idle: stop.
+2. **`analogizer.bin` with enable on, RGBS, SNAC none, Pocket screen on.**
+   The same picture on the Pocket and the CRT, at the board's line and frame
+   rate (a PVM's info screen shows them).  The bring-up panel shows on the
+   CRT too.  No picture: say whether the CRT reports a signal (sync but no
+   colour points at the DAC clock; nothing at all points at sync).
+3. **Each other video mode in turn** (RGsB and YPbPr need the SOG switch on).
+4. **SNAC**: one pad, assignment "SNAC P1 -> Pocket P1"; the Pocket's own
+   controls are then player 2.
+
 ## Log
 
 Date, build md5, what was seen, what it ruled out. One line each. The theories

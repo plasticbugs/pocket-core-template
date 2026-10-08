@@ -32,6 +32,7 @@ through building a core without re-learning it.
 | the bench has teeth | it **fails** the pre-fix memory module that blacked out a real core's first hardware run |
 | Quartus 18.1 full compile | succeeds; no negative slack in any corner; no ignored constraints |
 | a stamped copy | lints, passes the bench and synthesises |
+| `sim/run_analogizer.sh` | passes — every visible dot of a frame reaches the Analogizer's DAC pins unchanged, the scandoubler doubles the lines at half the period, each SNAC assignment maps as the configurator numbers it |
 | **on a Pocket** | **the skeleton itself has not been flashed.** Everything around it is running code from a shipped core; its own raster and test pattern are new. Flash it, then fix this line. |
 
 ## What you need
@@ -95,6 +96,17 @@ The core icon (`icon.bin`) ships here and is the same in every core. The
 platform image (`pkg/pocket/Platforms/_images/<setname>.bin`) is yours to
 make — 521×165, RGB565 big-endian, stored rotated. A core runs perfectly well
 without one, so leave it out until you have it.
+
+## Analogizer
+
+Cores built from this template support RndMnkIII's
+[Analogizer](https://github.com/RndMnkIII/Analogizer) adapter out of the box:
+the board's native 15 kHz video to a CRT, and native controllers through
+SNAC, configured from the shared `analogizer.bin` that Pupdate and
+AnalogizerConfigurator write. Set `USE_ANALOGIZER = 0` in `core_top.sv` to
+leave it out. `docs/analogizer.md` covers what to set for your board, and
+`docs/analogizer-retrofit.md` is the handoff for adding it to a core that
+predates the template's support.
 
 ## Licence and credit
 

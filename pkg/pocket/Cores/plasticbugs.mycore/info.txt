@@ -14,3 +14,9 @@ it to Assets/mycore/common/mycore.rom
 * A / Y  button 1
 * B / X  button 2
 * Select coin, Start start
+
+Analogizer: CRT video and SNAC pads,
+set from analogizer.bin (Pupdate or
+AnalogizerConfigurator) in
+Assets/analogizer/common. The slot is
+powered: remove any cartridge first.

@@ -1012,6 +1012,39 @@ core:
 
 ---
 
+### 5.30 The Analogizer: a second picture, and a file the Pocket has to find *(MSX2, Moo Mesa)*
+
+RndMnkIII's Analogizer takes the core's own picture out of the cartridge slot
+to a CRT, and native pads in through SNAC. The template carries it on by
+default (`target/pocket/pocket_analogizer.sv` around his vendored module;
+`docs/analogizer.md`), and `docs/analogizer-retrofit.md` is the order of work
+for a core that predates it. Three lessons cost a round each:
+
+- **The scandoubler needs the whole line and real blanking.** It sizes its
+  line buffer from `LINE_LEN` and times every output line from the H-blank
+  edges. MSX2 first gave it the visible width and no blanking. Every
+  scandoubled line lost its right half, and its syncs were garbage, with
+  nothing wrong on the Pocket's screen to point at it. The bench counts the
+  doubled lines and their period, so a wrong `LINE_LEN` or a missing blank
+  fails there, not on a VGA monitor.
+- **The settings are a file the Pocket must be told where to find.** It
+  reads `analogizer.bin` from the folder of the platform whose index is in
+  bits 25:24 of the slot's `parameters`, so `platform_ids` needs `analogizer`
+  in that position, and the slot is only offered with `cartridge_adapter: 0`.
+  Miss any one and the core loads, the adapter stays dark, and nothing says
+  why. `tools/check_json.py` cross-checks the three. The wiki's older
+  scheme, menu entries at `0xA0000000`, does nothing with the current module:
+  its master enable bit is never set from the menu.
+- **The DAC clock is a cartridge pin.** The module clocks the ADV7123 with
+  its own clock, so that clock leaves the FPGA through the slot's level
+  translators. Shipped cores use 42.95-48 MHz. A 96 MHz core gives it a 48 MHz
+  PLL output, in phase, and hands the pixel over, rather than asking the
+  translators for a rate no one has tried.
+
+The picture the Analogizer gets is the one the Pocket gets, before the
+scaler-side blanking, bring-up panel included. A panel readable on a CRT is
+worth having the day the Pocket's screen is blanked on purpose.
+
 ## 6. Sizing the board: what changes the plan
 
 Read these off `mame -listxml <set>` and the driver before writing anything.
@@ -1085,6 +1118,8 @@ fetched from another repository.
 | `tools/vendor.sh` | fetches a vendored CPU or sound core from its upstream, pinned |
 | `tools/examples/` | worked tools from a shipped core, as patterns for the ones only you can write |
 | `.github/workflows/compile.yml` | lint, compile, **every constraint applied**, timing closed, package, tag-triggered release |
+| `target/pocket/pocket_analogizer.sv`, `target/pocket/analogizer/` | Analogizer support: CRT video and SNAC pads, on by default, settings from `analogizer.bin` (§5.30) |
+| `sim/run_analogizer.sh` | the Analogizer path read at the cartridge pins: every visible dot, the scandoubler's lines, each SNAC assignment |
 
 What is *not* here, because only the board can say: the reference renderer, the
 frozen-state video bench, the MAME state dumper, and the RTL of the machine

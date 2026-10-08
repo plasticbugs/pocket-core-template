@@ -48,6 +48,18 @@ authors in the core's own README and in `docs/hardware.md`.
 Pleiads/Phoenix, Cadash and Master of Weapon cores, and this template was cut
 from the last of them.
 
+## RndMnkIII — [Analogizer](https://github.com/RndMnkIII/Analogizer)
+
+The Analogizer adapter and its `openFPGA_Pocket_Analogizer` module
+(`target/pocket/analogizer/`, vendored verbatim from his MiraxPocket core;
+`modules/VENDOR.md` has the commit), with the parts it gathers from others:
+the Y/C encoder by **Mike Simone** (MiSTerFPGA_YC_Encoder), the scandoubler
+and HQ2x by **Sorgelig** and **Ludvig Strigeus** (MiSTer), the PlayStation
+controller interface after **pgate1**'s psPAD, and the SNAC game-controller
+readers he credits to **@MikeSimonson**, the **MiST** project, **@RandyS**,
+**jotego**, **Scott Larson** (the PS/2 receiver) and **@tomasz**. Name him in
+the core's README when it ships with the adapter enabled.
+
 ## When you add to this
 
 Vendored CPU and sound cores (`modules/`) are recorded in `modules/VENDOR.md`

@@ -27,6 +27,17 @@ and by what; what the hardware found that no bench had; what is not
 implemented. Keep the three apart. A reader deciding whether to trust the core
 needs the second and third more than the first.
 
+## Analogizer
+
+The core supports RndMnkIII's [Analogizer](https://github.com/RndMnkIII/Analogizer)
+adapter: the board's native picture out of the VGA port (RGBS, RGsB, YPbPr,
+Y/C, or scandoubled for a VGA monitor), and SNAC controllers.  It is set up
+from `analogizer.bin` in `/Assets/analogizer/common/`, the file Pupdate and
+AnalogizerConfigurator write; without it the core is unchanged.  The Pocket
+powers the cartridge slot for this core: take any game cartridge out first.
+`docs/analogizer.md` has the modes and the controller assignments.  *(Say
+here whether it has been tried on an adapter.)*
+
 ## Building the ROM image
 
 ```sh
@@ -48,6 +59,7 @@ only — a couple of minutes, and it catches what Verilator cannot.
 ```sh
 sim/lint.sh          # every module on its own
 sim/run_mem.sh       # the Pocket's memory path, at the loader's real rate
+sim/run_analogizer.sh  # the Analogizer path, read at the cartridge pins
 ```
 
 Add the core's own gates here as they come to exist: the reference renderer
@@ -66,6 +78,6 @@ his Gateman CLI, `target/pocket/core_top.sv` starts from his template, and
 every build here runs in his `raetro/quartus:pocket` Docker image.
 
 Then: MAME, for the driver and devices this was written against (`ref/mame/`);
-the vendored cores and their authors (`modules/VENDOR.md`); Analogue, for the
-APF; and anyone whose board photographs, schematics or measurements are in
+the vendored cores and their authors (`modules/VENDOR.md`); RndMnkIII, for
+the Analogizer and its module; Analogue, for the APF; and anyone whose board photographs, schematics or measurements are in
 `docs/hardware.md`.

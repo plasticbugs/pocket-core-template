@@ -114,6 +114,8 @@ until it is checked, and commit at each one.
 | A game list (instance JSONs) flagged by the checker for a slot with no filename | `tools/check_json.py` accepts it when every instance names the file | 5.26 |
 | An `.mra` that only this repo's builder reads correctly (interleave `map` direction, padding bytes, merged sets) | `tools/check_mra.py <romdir>` builds each with `mra_build.py` and the standard `mra` tool and fails if they differ; maps are read right to left | 5.7 |
 | A release zip and title named after another core | `tools/cut-release.sh` reads both from the package; it also takes the flashed bitstream directly | 5.6 |
+| Analogizer support that the Pocket never configures: settings file looked for in the wrong platform folder, cart slot unpowered | `tools/check_json.py` cross-checks the slot, `platform_ids` and `cartridge_adapter` | 5.30 |
+| Analogizer scandoubler sized to the visible width, or fed no blanking | `LINE_LEN` is the whole line; `sim/run_analogizer.sh` counts the doubled lines | 5.30 |
 
 Not defusable in code -- read these before you meet them:
 
@@ -125,6 +127,11 @@ Not defusable in code -- read these before you meet them:
 - **On the Pocket, SDRAM burst writes take one word a clock; burst reads may
   not** -- keep the pace a runtime choice per direction until hardware has
   chosen, with the tested setting as the all-clear default (5.28).
+- **The Analogizer is on by default** (`USE_ANALOGIZER`, docs/analogizer.md):
+  set `LINE_LEN` in `core_top` and the raster at the top of
+  `sim/tb_analogizer.sv` when the machine's raster replaces the skeleton's,
+  and read `key1..key4`, never `cont*_key`, wherever the game takes its
+  controls, or SNAC pads will not reach it (5.30).
 - **An emulator's saved settings are hidden state**: give each investigation
   its own `-cfg_directory` / `-nvram_directory` (5.29).
 
@@ -144,6 +151,8 @@ modules/                                vendored CPUs and sound chips; VENDOR.md
 target/pocket/core_top.sv               APF glue; game-specific only below "@ The game"
 target/pocket/mycore_mem.sv             SDRAM clients, download FIFO, burst arbiter, SRAM
 target/pocket/sdram_ctrl.sv sram_port.sv   proven on hardware; do not edit casually
+target/pocket/pocket_analogizer.sv     the Analogizer: clock hand-over, Y/C, SNAC -> key1..4
+target/pocket/analogizer/              RndMnkIII's adapter module, verbatim (docs/analogizer.md)
 projects/                               Quartus project, SDC, report_worst.tcl
 platform/pocket/                        OpenGateware's gateman-pocket (Marcus Andrade) — leave alone
 pkg/pocket/                             what goes on the SD card (never a ROM)
@@ -167,6 +176,7 @@ tools/check_frames.py artifacts/still -w W -h H   # THREE CONSECUTIVE frames of 
 tools/check_json.py pkg/pocket --active WxH       # what the firmware silently refuses
 sim/run_mem.sh -quick        # a minute; after touching mycore_mem.sv (drop -quick before a flash)
 sim/run_system.sh -frames 10 # the whole machine through the real memory glue
+sim/run_analogizer.sh        # the Analogizer path, read at the cartridge pins
 tools/vendor.sh              # list the CPU and sound cores it can fetch from upstream
 ./build-local.sh map         # two minutes; catches what Verilator cannot
 ./build-local.sh compile     # 10-25 minutes; then read projects/output_files/*.sta.summary

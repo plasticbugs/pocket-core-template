@@ -3,7 +3,8 @@
     "magic": "APF_VER_1",
     "metadata": {
       "platform_ids": [
-        "mycore"
+        "mycore",
+        "analogizer"
       ],
       "shortname": "mycore",
       "description": "My Core (MANUFACTURER, YEAR) arcade core",
@@ -22,7 +23,7 @@
       },
       "hardware": {
         "link_port": false,
-        "cartridge_adapter": -1
+        "cartridge_adapter": 0
       }
     },
     "cores": [
