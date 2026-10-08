@@ -32,8 +32,8 @@ needs the second and third more than the first.
 The core supports RndMnkIII's [Analogizer](https://github.com/RndMnkIII/Analogizer)
 adapter: the board's native picture out of the VGA port (RGBS, RGsB, YPbPr,
 Y/C, or scandoubled for a VGA monitor), and SNAC controllers.  It is set up
-from `analogizer.bin` in `/Assets/analogizer/common/`, the file Pupdate and
-AnalogizerConfigurator write; without it the core is unchanged.  The Pocket
+in the core's own menu (Analogizer, Analogizer Video, SNAC Adapter, SNAC
+Assignment); with "Analogizer" off, the default, the core is unchanged.  The Pocket
 powers the cartridge slot for this core: take any game cartridge out first.
 `docs/analogizer.md` has the modes and the controller assignments.  *(Say
 here whether it has been tried on an adapter.)*

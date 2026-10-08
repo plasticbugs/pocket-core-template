@@ -114,7 +114,8 @@ until it is checked, and commit at each one.
 | A game list (instance JSONs) flagged by the checker for a slot with no filename | `tools/check_json.py` accepts it when every instance names the file | 5.26 |
 | An `.mra` that only this repo's builder reads correctly (interleave `map` direction, padding bytes, merged sets) | `tools/check_mra.py <romdir>` builds each with `mra_build.py` and the standard `mra` tool and fails if they differ; maps are read right to left | 5.7 |
 | A release zip and title named after another core | `tools/cut-release.sh` reads both from the package; it also takes the flashed bitstream directly | 5.6 |
-| Analogizer support that the Pocket never configures: settings file looked for in the wrong platform folder, cart slot unpowered | `tools/check_json.py` cross-checks the slot, `platform_ids` and `cartridge_adapter` | 5.30 |
+| Analogizer support that the Pocket never configures: a menu entry writing outside its mask, no entry setting the enable, a file slot loading over the menu's word, cart slot unpowered | `tools/check_json.py` checks the entries at `0xF7000000`, the slots and `cartridge_adapter` | 5.30 |
+| Analogizer menu entries wiping each other: the bridge samples read data before it pulses `bridge_rd`, so a read-back latched on the pulse is the previous read's | `pocket_analogizer.sv` reads the word back combinationally; `sim/run_analogizer.sh` sets every option by read-merge-write and fails without it | 5.30 |
 | Analogizer scandoubler sized to the visible width, or fed no blanking | `LINE_LEN` is the whole line; `sim/run_analogizer.sh` counts the doubled lines | 5.30 |
 
 Not defusable in code -- read these before you meet them:
@@ -127,11 +128,13 @@ Not defusable in code -- read these before you meet them:
 - **On the Pocket, SDRAM burst writes take one word a clock; burst reads may
   not** -- keep the pace a runtime choice per direction until hardware has
   chosen, with the tested setting as the all-clear default (5.28).
-- **The Analogizer is on by default** (`USE_ANALOGIZER`, docs/analogizer.md):
+- **The Analogizer is built in** (`USE_ANALOGIZER`, docs/analogizer.md):
   set `LINE_LEN` in `core_top` and the raster at the top of
   `sim/tb_analogizer.sv` when the machine's raster replaces the skeleton's,
-  and read `key1..key4`, never `cont*_key`, wherever the game takes its
-  controls, or SNAC pads will not reach it (5.30).
+  read `key1..key4`, never `cont*_key`, wherever the game takes its
+  controls, or SNAC pads will not reach it, and keep its four menu entries
+  (ids 70-73, `0xF7000000`) when you write the game's own into
+  `interact.json` -- 14 entries is the most any installed core has (5.30).
 - **An emulator's saved settings are hidden state**: give each investigation
   its own `-cfg_directory` / `-nvram_directory` (5.29).
 

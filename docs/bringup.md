@@ -79,16 +79,20 @@ Only once the core itself is healthy on the Pocket's screen, and in this
 order -- each step's reading tells the next where to look
 (docs/analogizer.md):
 
-1. **No `analogizer.bin` on the card.**  The core must play exactly as
+1. **Menu "Analogizer: Off"** (the default).  The core must play exactly as
    without the adapter.  If it does not, the cart port is not idle: stop.
-2. **`analogizer.bin` with enable on, RGBS, SNAC none, Pocket screen on.**
+2. **Menu: Analogizer On, Video RGBS, SNAC Adapter None.**
    The same picture on the Pocket and the CRT, at the board's line and frame
    rate (a PVM's info screen shows them).  The bring-up panel shows on the
    CRT too.  No picture: say whether the CRT reports a signal (sync but no
    colour points at the DAC clock; nothing at all points at sync).
 3. **Each other video mode in turn** (RGsB and YPbPr need the SOG switch on).
-4. **SNAC**: one pad, assignment "SNAC P1 -> Pocket P1"; the Pocket's own
+4. **SNAC**: one pad, assignment "SNAC P1 -> P1"; the Pocket's own
    controls are then player 2.
+5. **The menu's memory**: change Video, quit the core and load it again.
+   The setting, and Analogizer On, should still be there.  Then change one
+   entry and check the others did not move (the bench's read-back check,
+   on the real firmware).
 
 ## Log
 

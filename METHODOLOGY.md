@@ -1012,13 +1012,13 @@ core:
 
 ---
 
-### 5.30 The Analogizer: a second picture, and a file the Pocket has to find *(MSX2, Moo Mesa)*
+### 5.30 The Analogizer: a second picture, and settings the player can find *(MSX2, Moo Mesa)*
 
 RndMnkIII's Analogizer takes the core's own picture out of the cartridge slot
 to a CRT, and native pads in through SNAC. The template carries it on by
 default (`target/pocket/pocket_analogizer.sv` around his vendored module;
 `docs/analogizer.md`), and `docs/analogizer-retrofit.md` is the order of work
-for a core that predates it. Three lessons cost a round each:
+for a core that predates it. Four lessons cost a round each:
 
 - **The scandoubler needs the whole line and real blanking.** It sizes its
   line buffer from `LINE_LEN` and times every output line from the H-blank
@@ -1027,14 +1027,30 @@ for a core that predates it. Three lessons cost a round each:
   nothing wrong on the Pocket's screen to point at it. The bench counts the
   doubled lines and their period, so a wrong `LINE_LEN` or a missing blank
   fails there, not on a VGA monitor.
-- **The settings are a file the Pocket must be told where to find.** It
-  reads `analogizer.bin` from the folder of the platform whose index is in
-  bits 25:24 of the slot's `parameters`, so `platform_ids` needs `analogizer`
-  in that position, and the slot is only offered with `cartridge_adapter: 0`.
-  Miss any one and the core loads, the adapter stays dark, and nothing says
-  why. `tools/check_json.py` cross-checks the three. The wiki's older
-  scheme, menu entries at `0xA0000000`, does nothing with the current module:
-  its master enable bit is never set from the menu.
+- **Put the settings in the core's menu, not in a file.** The adapter
+  module 1.4 reads `analogizer.bin`, a shared file Pupdate writes, and this
+  template first followed it: a data slot at `0xF7000000`, a second platform
+  id `analogizer` for the folder, the master enable in the file. It was
+  right by the module and wrong for the player. The adapter's own *How to
+  use it* page never mentions the file, the first person to install the core
+  had no file and an empty `Assets/analogizer/common/`, and their other
+  Analogizer cores all set it from the menu (the wiki's "Pocket Menu" kind:
+  RndMnkIII's arcade and console ports). The core now writes the same word
+  from four masked `interact.json` entries, off by default, and
+  `tools/check_json.py` refuses an entry outside its mask, a menu with no
+  enable, a data slot over the word, or an unpowered slot. Earlier versions
+  of this section and of the retrofit handoff called the menu scheme
+  obsolete; it is not, it is what players have.
+- **A read-back latched on `bridge_rd` is the previous read's.** The bridge
+  (`io_bridge_peripheral.sv`) presents the address, samples the read data
+  four clocks later, and only then pulses `bridge_rd`. The adapter module,
+  like `interact.sv`, updates its read data on that pulse. Masked entries
+  share one word, so a firmware that merges them by reading the word back
+  gets a stale value and wipes the other fields: on the bench, choosing a
+  video mode turned the Analogizer off. `pocket_analogizer.sv` reads its own
+  copy back combinationally, as RndMnkIII's menu cores do, and the bench
+  sets every option by read-merge-write at the bridge's timing. Whether the
+  firmware reads back at all is not known; this works either way.
 - **The DAC clock is a cartridge pin.** The module clocks the ADV7123 with
   its own clock, so that clock leaves the FPGA through the slot's level
   translators. Shipped cores use 42.95-48 MHz. A 96 MHz core gives it a 48 MHz
@@ -1118,7 +1134,7 @@ fetched from another repository.
 | `tools/vendor.sh` | fetches a vendored CPU or sound core from its upstream, pinned |
 | `tools/examples/` | worked tools from a shipped core, as patterns for the ones only you can write |
 | `.github/workflows/compile.yml` | lint, compile, **every constraint applied**, timing closed, package, tag-triggered release |
-| `target/pocket/pocket_analogizer.sv`, `target/pocket/analogizer/` | Analogizer support: CRT video and SNAC pads, on by default, settings from `analogizer.bin` (§5.30) |
+| `target/pocket/pocket_analogizer.sv`, `target/pocket/analogizer/` | Analogizer support: CRT video and SNAC pads, built in, set from four entries in the core's menu, off until the player turns it on (§5.30) |
 | `sim/run_analogizer.sh` | the Analogizer path read at the cartridge pins: every visible dot, the scandoubler's lines, each SNAC assignment |
 
 What is *not* here, because only the board can say: the reference renderer, the

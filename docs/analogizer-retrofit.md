@@ -6,7 +6,8 @@ Pocket core that predates it in this template. A core started from the
 template today already has it; `docs/analogizer.md` describes that, and
 should be read first. This file is the order of work and the traps, written
 from adding it to Moo Mesa (2026-10; `plasticbugs/moomesa`, branch
-`analogizer`, commit `72271e8`, a complete worked example of every step below)
+`analogizer`, a complete worked example of every step below; its commit
+`72271e8` used the settings file, and `c631ff4` moved it to the menu)
 and from the MSX2 core, where RndMnkIII and plasticbugs added it by hand
 (2026-08).
 
@@ -51,11 +52,17 @@ commit message:
    within ~15 blocks of 308 may not fit, so check the last fit summary before
    starting.
 7. **Bridge address `0xF7xxxxxx` is free.** Grep the core for anything
-   decoding it, including a `casex` with `32'hFxxxxxxx`. The settings file is
-   written there.
+   decoding it, including a `casex` with `32'hFxxxxxxx`. The menu writes the
+   settings word there.
 8. **Does the core already have an Analogizer?** If it does (MSX2 does), this
-   is a replacement. Keep its `interact`/file scheme decision (section 4) and
+   is a replacement. Keep its settings scheme (menu or file, section 4) and
    its SNAC mapping until the user says otherwise.
+9. **Room in the menu.** The Analogizer adds four `interact.json` entries and
+   32 options. `tools/check_json.py` holds a core to what installed cores
+   are seen to load: 14 entries, 52 options, 7,600 bytes. Count the core's
+   own before starting; if it is short of room, compact the file's layout
+   (one option to a line), then fold entries the way the template folds the
+   Pocket-screen blank into "Analogizer".
 
 ## 1. Copy the files
 
@@ -98,8 +105,8 @@ Take the template's `core_top.sv` as the reference and search for
 1. Parameter `USE_ANALOGIZER = 1`.
 2. Wrap the core's "cart is unused" `assign`s to `cart_tran_*` in
    `generate if (USE_ANALOGIZER == 0)`. The wrapper drives the pins
-   otherwise, and holds them at exactly those levels until the settings file
-   enables it.
+   otherwise, and holds them at exactly those levels until the menu enables
+   it.
 3. The bridge read mux: `32'hF7xxxxxx: bridge_rd_data <= ana_bridge_rd_data;`.
 4. `wire [31:0] key1..key4`, and every `cont*_key` read changed to `key*`
    (step 0.5). Joystick and trigger words are unchanged.
@@ -119,32 +126,50 @@ Take the template's `core_top.sv` as the reference and search for
    - The bridge signals, `cont1..4_key`, and every `cart_*` pin straight
      through.
 
-## 4. Settings: the file, not the menu
+## 4. Settings: the menu, not the file
 
-The Analogizer wiki's specifications page shows settings in `interact.json`
-at `0xA0000000`. That is the old scheme. The module this template vendors
-(1.4) reads only `analogizer.bin` at `0xF7000000`, written by Pupdate and
-AnalogizerConfigurator and shared by every core on the card. Bit 5 is a
-master enable, which the menu scheme never set, so menu entries would leave
-it off. Do not add Analogizer entries to `interact.json`. The bit layout is
-in `docs/analogizer.md`.
+Copy the template's four entries (ids 70–73, all at `0xF7000000`) into the
+core's `interact.json`: "Analogizer" (enable, and the Pocket-screen blank),
+"Analogizer Video", "SNAC Adapter", "SNAC Assignment". Each is a list whose
+mask keeps every bit but its own field, `defaultval` 0, `persist` true.
+Change an id only if the core already uses it. The bit layout is in
+`docs/analogizer.md`.
+
+The adapter module 1.4 was written to read `analogizer.bin` instead, a file
+Pupdate and AnalogizerConfigurator write to `/Assets/analogizer/common/`.
+The first version of this handoff said to use it. Do not: the adapter's
+*How to use it* page never mentions the file, players do not have it, and
+their other Analogizer cores are set from the menu (the wiki's "Pocket
+Menu" kind). With the file, a player who installs the core has an adapter
+that stays dark and no way to find out why.
+
+Two things about the word, both already in `pocket_analogizer.sv`:
+
+- The module is told `bridge_endian_little = 1`. Menu values are numbers;
+  the byte swap it does for a file would move every field.
+- The word is read back from the wrapper's own register, combinationally,
+  not from the module's read-back. The bridge samples read data before it
+  pulses `bridge_rd`, so the module's latched value is the previous read's,
+  and masked entries merged from it wipe each other. The bench fails at the
+  second menu entry with the module's read-back.
+
+If the core already reads `analogizer.bin` (an earlier retrofit, or the
+first Moo Mesa branch), remove its data slot, the `analogizer` platform id
+and the slot's `parameters`; a slot left at `0xF7000000` would load a file
+over the menu's word at every start, and `tools/check_json.py` refuses it.
 
 ## 5. The package
 
-- `core.json`: `"platform_ids": ["<shortname>", "analogizer"]`, with the
-  core's own platform **first** (tools and the Pocket's library use index 0),
-  and `"cartridge_adapter": 0`.
-- `data.json`: a slot named "Analogizer config", an unused id (10 by
-  convention), `"filename": "analogizer.bin"`, `"address": "0xF7000000"`,
-  `"parameters": "0x1000000"`, `"required": false`, `"nonvolatile": false`.
-  Bits 25:24 of `parameters` are the index into `platform_ids` of the folder
-  the file is read from. `0x1000000` means index 1, `analogizer`, so it must
-  be second. Adding a slot at the end moves no other slot id. If you insert
-  one in the middle, every slot id in `core_top` moves with it.
-- `info.txt`: one paragraph. The file goes in `Assets/analogizer/common/`,
-  and the cartridge slot is powered, so remove any game cartridge first.
-- `tools/check_json.py pkg/pocket --active WxH` fails if the slot, the
-  platform index and the cart power disagree.
+- `interact.json`: the four entries (section 4).
+- `core.json`: `"cartridge_adapter": 0`. The platform ids stay the core's
+  own; no `analogizer` id is needed without the file.
+- `info.txt`: one paragraph. Settings are in the core's menu ("Analogizer:
+  On"), and the cartridge slot is powered, so remove any game cartridge
+  first.
+- `tools/check_json.py pkg/pocket --active WxH` fails if an entry writes
+  outside its mask, no entry sets the enable, a data slot writes
+  `0xF7000000`, the slot is not powered, or the menu is larger than any
+  installed core's.
 
 ## 6. Credit
 
@@ -163,9 +188,13 @@ but paths.
    RGBS line must show `0 differ`, every visible dot and line, and the
    scandoubler at exactly twice the lines and half the line period. A
    scandoubler line count off by a few means `LINE_LEN` or the blanking is
-   wrong (step 0.1, 0.2).
+   wrong (step 0.1, 0.2). The `menu:` line must count every option of the
+   four entries (32). The script reads them from
+   `pkg/pocket/Cores/*/interact.json`; point it at the core's own package if
+   that lives elsewhere (`dist/Cores/...`).
 3. The core's own gates, unchanged: frozen states, memory, system bench.
-   With no settings file nothing in the machine changed, and they show that.
+   With the menu at its default nothing in the machine changed, and they
+   show that.
 4. `./build-local.sh compile` (or the core's build). Read the fit summary for
    RAM blocks and ALMs, and the timing summary for every corner. Put both,
    before and after, in the commit message. **Expect the SDRAM capture to
@@ -175,8 +204,9 @@ but paths.
    SDRAM clock phase as the SDC describes (METHODOLOGY 5.20), not by touching
    the Analogizer. Moo Mesa kept +0.080 ns at the old phase.
 5. On hardware, `docs/bringup.md`'s "With an Analogizer" order: first with
-   no file (the core must be exactly as before), then RGBS, then each mode,
-   then SNAC.
+   "Analogizer: Off" (the core must be exactly as before), then RGBS, then
+   each mode, then SNAC, then that the menu remembers its settings across a
+   reload and that changing one entry leaves the others alone.
 
 ## 8. Commit message
 
