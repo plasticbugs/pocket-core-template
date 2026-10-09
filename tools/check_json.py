@@ -58,7 +58,8 @@ import sys
 #     variables      up to 14      option values   up to 0x00C00000
 #     bytes          up to 7,597   options a list  up to 16
 #     longest name   26            defaultval      0..3
-#     options in the whole file    up to 52
+#     options in the whole file    up to 52 then; 68 loads, 70 does not
+#                                  (measured since: HW_OPTS_MAX below)
 #
 # The 23 characters an earlier version of this file called a limit was a
 # guess, and wrong: OpenJazz ships a 26-character name and loads.
@@ -70,7 +71,6 @@ import sys
 NAME_MAX = 26
 OPTS_MAX = 16
 SIZE_MAX = 7600
-TOTAL_OPTS_MAX = 52    # atarisy2's, the most of any core that loads here
 VARS_MAX = 16          # Analogue's documented limit
 ENTRIES_MAX = 20       # interact variables and data slots together
 
@@ -142,10 +142,6 @@ def main(argv):
             if len(v) + ns > ENTRIES_MAX:
                 fault(path, f'{len(v)} variables and {ns} data slots, more than '
                             f'the {ENTRIES_MAX} entries the Pocket allows together')
-            total = sum(len(x.get('options', [])) for x in v)
-            if total > TOTAL_OPTS_MAX:
-                fault(path, f'{total} options in the whole file, more than the '
-                            f'{TOTAL_OPTS_MAX} of any core that loads here')
             for x in v:
                 for val in ([o.get('value') for o in x.get('options', [])]
                             + [x.get('value')]):
@@ -292,6 +288,26 @@ def main(argv):
         if core.get('framework', {}).get('hardware', {}).get('cartridge_adapter') != 0:
             fault(cj, 'Analogizer menu present but cartridge_adapter is not 0: '
                       'the cartridge port is not powered')
+
+    # What the firmware refuses, measured on hardware (2026-10-09): with 16
+    # entries, 70 and 77 options in the whole menu stopped Atari System 2 and
+    # BBC Micro with "Error in interact" at core setup, while MSX2 loads with
+    # 68 options (80 with its entries) and Cadash and Cloak with 54.
+    # Analogue's docs say a list's options count toward no limit; on this
+    # firmware they do, somewhere above 68.
+    HW_OPTS_MAX, HW_OPTS_VARS_MAX = 68, 80
+    for path in files:
+        if os.path.basename(path) != 'interact.json':
+            continue
+        try:
+            hv = json.load(open(path))['interact'].get('variables', [])
+        except Exception:
+            continue
+        hn = sum(len(x.get('options', [])) for x in hv)
+        if hn > HW_OPTS_MAX or hn + len(hv) > HW_OPTS_VARS_MAX:
+            fault(path, f'{hn} options and {len(hv)} entries: the firmware refused '
+                        f'70 options (86 with entries) and loads 68 (80); keep to '
+                        f'{HW_OPTS_MAX} and {HW_OPTS_VARS_MAX}')
 
     for f in bad:
         print('  ' + f)
