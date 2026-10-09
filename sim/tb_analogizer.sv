@@ -332,6 +332,15 @@ module tb_analogizer;
         real hold;
         frame_start();
         repeat (2000) @(posedge clk);
+        // start inside vertical blanking: a whole line with no picture (a
+        // board that draws on its last line has it a line late here)
+        begin
+            int dark = 0;
+            while (dark < HTOTAL * APD) begin
+                @(negedge clk);
+                dark = dac_blank_n ? 0 : dark + 1;
+            end
+        end
         want_len = (W * APD * (100 + p) + 50) / 100;
         hold = APD * (100.0 + p) / 100.0;
         lo = $floor(hold); hi = $ceil(hold);
@@ -540,7 +549,12 @@ module tb_analogizer;
                 if (gh - (HS1 - HS0) * APD < CB_END) begin
                     $display("  %0d clocks from hsync's end to the picture, the colour burst needs %0d",
                              gh - (HS1 - HS0) * APD, CB_END);
-                    fail("position: the picture starts inside the Y/C colour burst");
+                    // a board whose own timing already puts the burst on the
+                    // picture (Y/C only) is noted, not failed
+                    if (gh0 - (HS1 - HS0) * APD >= CB_END)
+                        fail("position: the picture starts inside the Y/C colour burst");
+                    else $display("  note: the board's own timing already does (%0d clocks at 0); Y/C only",
+                                  gh0 - (HS1 - HS0) * APD);
                 end
                 write_settings(settings(1'b1, 5'h00, 4'd0, 4'h5, 1'b0));
                 check_svga();
