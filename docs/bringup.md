@@ -93,6 +93,12 @@ order -- each step's reading tells the next where to look
    The setting, and Analogizer On, should still be there.  Then change one
    entry and check the others did not move (the bench's read-back check,
    on the real firmware).
+6. **Position**: "Analogizer V Position" + should move the picture down
+   by that many lines, + on "H Position" to the right, and both should be
+   kept across a reload.  The slider showing a value other than the one
+   set means the firmware is not reading 0xF7000004/8 back as written.  A
+   picture that rolls or tears at either end of a slider means the range
+   is too wide for that set (say which end, and which mode).
 
 ## Log
 

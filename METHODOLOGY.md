@@ -1018,7 +1018,7 @@ RndMnkIII's Analogizer takes the core's own picture out of the cartridge slot
 to a CRT, and native pads in through SNAC. The template carries it on by
 default (`target/pocket/pocket_analogizer.sv` around his vendored module;
 `docs/analogizer.md`), and `docs/analogizer-retrofit.md` is the order of work
-for a core that predates it. Four lessons cost a round each:
+for a core that predates it. Five lessons cost a round each:
 
 - **The scandoubler needs the whole line and real blanking.** It sizes its
   line buffer from `LINE_LEN` and times every output line from the H-blank
@@ -1049,13 +1049,27 @@ for a core that predates it. Four lessons cost a round each:
   gets a stale value and wipes the other fields: on the bench, choosing a
   video mode turned the Analogizer off. `pocket_analogizer.sv` reads its own
   copy back combinationally, as RndMnkIII's menu cores do, and the bench
-  sets every option by read-merge-write at the bridge's timing. Whether the
-  firmware reads back at all is not known; this works either way.
+  sets every option by read-merge-write at the bridge's timing. Analogue's
+  interact.json documentation says the firmware does read back: every
+  entry not marked `writeonly`, every frame, and a masked entry is written
+  as that read merged with its field. (Earlier versions of this section
+  said that was not known.)
 - **The DAC clock is a cartridge pin.** The module clocks the ADV7123 with
   its own clock, so that clock leaves the FPGA through the slot's level
   translators. Shipped cores use 42.95-48 MHz. A 96 MHz core gives it a 48 MHz
   PLL output, in phase, and hands the pixel over, rather than asking the
   translators for a rate no one has tried.
+- **Centring the picture on a CRT is moving the syncs, and the adapter
+  re-reads their polarity every period.** The first CRT showed Moo Mesa
+  about 10 lines high. Two signed sliders (`0xF7000004`, `0xF7000008`) now
+  re-make hsync and vsync earlier or later from the source's own edges, and
+  the picture, blanking and every mode follow untouched. The module's
+  `sync_fix` decides each sync's polarity afresh from whether the last
+  period was more high than low, so a jump between settings that puts two
+  pulses close together turns csync inside out for a frame: the template's
+  bench caught it at +2 to -2 lines. A re-made pulse now waits until it has
+  been off as long as it is on. The range is the core's, from its blanking;
+  the bench fails if a sync reaches the picture at either end.
 
 The picture the Analogizer gets is the one the Pocket gets, before the
 scaler-side blanking, bring-up panel included. A panel readable on a CRT is
@@ -1134,7 +1148,7 @@ fetched from another repository.
 | `tools/vendor.sh` | fetches a vendored CPU or sound core from its upstream, pinned |
 | `tools/examples/` | worked tools from a shipped core, as patterns for the ones only you can write |
 | `.github/workflows/compile.yml` | lint, compile, **every constraint applied**, timing closed, package, tag-triggered release |
-| `target/pocket/pocket_analogizer.sv`, `target/pocket/analogizer/` | Analogizer support: CRT video and SNAC pads, built in, set from four entries in the core's menu, off until the player turns it on (§5.30) |
+| `target/pocket/pocket_analogizer.sv`, `target/pocket/analogizer/` | Analogizer support: CRT video and SNAC pads, built in, set from the core's menu (four entries, and two to centre the picture on the CRT), off until the player turns it on (§5.30) |
 | `sim/run_analogizer.sh` | the Analogizer path read at the cartridge pins: every visible dot, the scandoubler's lines, each SNAC assignment |
 
 What is *not* here, because only the board can say: the reference renderer, the

@@ -102,7 +102,8 @@ without one, so leave it out until you have it.
 Cores built from this template support RndMnkIII's
 [Analogizer](https://github.com/RndMnkIII/Analogizer) adapter out of the box:
 the board's native 15 kHz video to a CRT, and native controllers through
-SNAC, configured from four entries in the core's own menu (off by default).
+SNAC, configured in the core's own menu (off by default), with sliders to
+centre the picture on the CRT.
 Set `USE_ANALOGIZER = 0` in `core_top.sv` to
 leave it out. `docs/analogizer.md` covers what to set for your board, and
 `docs/analogizer-retrofit.md` is the handoff for adding it to a core that

@@ -132,9 +132,11 @@ Not defusable in code -- read these before you meet them:
   set `LINE_LEN` in `core_top` and the raster at the top of
   `sim/tb_analogizer.sv` when the machine's raster replaces the skeleton's,
   read `key1..key4`, never `cont*_key`, wherever the game takes its
-  controls, or SNAC pads will not reach it, and keep its four menu entries
-  (ids 70-73, `0xF7000000`) when you write the game's own into
-  `interact.json` -- 14 entries is the most any installed core has (5.30).
+  controls, or SNAC pads will not reach it, and keep its six menu entries
+  (ids 70-75, `0xF7000000`-`0xF7000008`) when you write the game's own into
+  `interact.json` -- Analogue's limit is 16 entries, 20 with the data slots.
+  Set the two position sliders' range from the new raster's blanking;
+  the bench fails if a sync reaches the picture at either end (5.30).
 - **An emulator's saved settings are hidden state**: give each investigation
   its own `-cfg_directory` / `-nvram_directory` (5.29).
 

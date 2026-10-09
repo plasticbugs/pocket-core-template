@@ -7,7 +7,8 @@ template today already has it; `docs/analogizer.md` describes that, and
 should be read first. This file is the order of work and the traps, written
 from adding it to Moo Mesa (2026-10; `plasticbugs/moomesa`, branch
 `analogizer`, a complete worked example of every step below; its commit
-`72271e8` used the settings file, and `c631ff4` moved it to the menu)
+`72271e8` used the settings file, `c631ff4` moved it to the menu, and
+`8187bfe` added the position sliders)
 and from the MSX2 core, where RndMnkIII and plasticbugs added it by hand
 (2026-08).
 
@@ -57,12 +58,17 @@ commit message:
 8. **Does the core already have an Analogizer?** If it does (MSX2 does), this
    is a replacement. Keep its settings scheme (menu or file, section 4) and
    its SNAC mapping until the user says otherwise.
-9. **Room in the menu.** The Analogizer adds four `interact.json` entries and
-   32 options. `tools/check_json.py` holds a core to what installed cores
-   are seen to load: 14 entries, 52 options, 7,600 bytes. Count the core's
-   own before starting; if it is short of room, compact the file's layout
-   (one option to a line), then fold entries the way the template folds the
-   Pocket-screen blank into "Analogizer".
+9. **Room in the menu.** The Analogizer adds six `interact.json` entries
+   (four lists with 32 options, two sliders). Analogue allows 16 entries,
+   20 with the data slots; `tools/check_json.py` also holds a core to what
+   installed cores are seen to load: 52 options, 7,600 bytes. Count the
+   core's own before starting; if it is short of room, compact the file's
+   layout (one option to a line), then fold entries the way the template
+   folds the Pocket-screen blank into "Analogizer".
+10. **The blanking, for the position range.** How many dots between the
+   end of the picture and hsync, and between hsync's end and the next
+   picture; how many lines between the picture and vsync on each side.
+   They set the two position sliders' range (section 4).
 
 ## 1. Copy the files
 
@@ -135,6 +141,15 @@ mask keeps every bit but its own field, `defaultval` 0, `persist` true.
 Change an id only if the core already uses it. The bit layout is in
 `docs/analogizer.md`.
 
+Then the two position sliders, ids 74–75: "Analogizer H Position" at
+`0xF7000004` and "Analogizer V Position" at `0xF7000008`, `slider_u32`,
+`signed`, `defaultval` 0, no mask. Set their range from step 0.10:
+rightward, hsync can come earlier until it meets the picture; leftward,
+later until the Y/C colour burst (it ends about 3.5 µs after hsync does)
+would; vertically, until vsync reaches a picture line. The template's
+skeleton gives ±16 dots and ±2 lines, Moo Mesa ±24 and ±16. The bench
+tries both ends.
+
 The adapter module 1.4 was written to read `analogizer.bin` instead, a file
 Pupdate and AnalogizerConfigurator write to `/Assets/analogizer/common/`.
 The first version of this handoff said to use it. Do not: the adapter's
@@ -160,7 +175,7 @@ over the menu's word at every start, and `tools/check_json.py` refuses it.
 
 ## 5. The package
 
-- `interact.json`: the four entries (section 4).
+- `interact.json`: the six entries (section 4).
 - `core.json`: `"cartridge_adapter": 0`. The platform ids stay the core's
   own; no `analogizer` id is needed without the file.
 - `info.txt`: one paragraph. Settings are in the core's menu ("Analogizer:
@@ -189,7 +204,10 @@ but paths.
    scandoubler at exactly twice the lines and half the line period. A
    scandoubler line count off by a few means `LINE_LEN` or the blanking is
    wrong (step 0.1, 0.2). The `menu:` line must count every option of the
-   four entries (32). The script reads them from
+   four list entries (32). The `position` lines must show csync moving
+   by the dots and lines asked at both ends of the sliders, never low
+   inside the picture, and the two `at once` lines 0 clocks: a range too
+   wide for the core's blanking fails here. The script reads them from
    `pkg/pocket/Cores/*/interact.json`; point it at the core's own package if
    that lives elsewhere (`dist/Cores/...`).
 3. The core's own gates, unchanged: frozen states, memory, system bench.
@@ -206,7 +224,8 @@ but paths.
 5. On hardware, `docs/bringup.md`'s "With an Analogizer" order: first with
    "Analogizer: Off" (the core must be exactly as before), then RGBS, then
    each mode, then SNAC, then that the menu remembers its settings across a
-   reload and that changing one entry leaves the others alone.
+   reload and that changing one entry leaves the others alone, then the
+   position sliders.
 
 ## 8. Commit message
 

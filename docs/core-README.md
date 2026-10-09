@@ -33,7 +33,8 @@ The core supports RndMnkIII's [Analogizer](https://github.com/RndMnkIII/Analogiz
 adapter: the board's native picture out of the VGA port (RGBS, RGsB, YPbPr,
 Y/C, or scandoubled for a VGA monitor), and SNAC controllers.  It is set up
 in the core's own menu (Analogizer, Analogizer Video, SNAC Adapter, SNAC
-Assignment); with "Analogizer" off, the default, the core is unchanged.  The Pocket
+Assignment, and H and V Position to centre the picture on the CRT); with
+"Analogizer" off, the default, the core is unchanged.  The Pocket
 powers the cartridge slot for this core: take any game cartridge out first.
 `docs/analogizer.md` has the modes and the controller assignments.  *(Say
 here whether it has been tried on an adapter.)*
