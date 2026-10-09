@@ -1018,7 +1018,7 @@ RndMnkIII's Analogizer takes the core's own picture out of the cartridge slot
 to a CRT, and native pads in through SNAC. The template carries it on by
 default (`target/pocket/pocket_analogizer.sv` around his vendored module;
 `docs/analogizer.md`), and `docs/analogizer-retrofit.md` is the order of work
-for a core that predates it. Five lessons cost a round each:
+for a core that predates it. Six lessons cost a round each:
 
 - **The scandoubler needs the whole line and real blanking.** It sizes its
   line buffer from `LINE_LEN` and times every output line from the H-blank
@@ -1070,6 +1070,13 @@ for a core that predates it. Five lessons cost a round each:
   bench caught it at +2 to -2 lines. A re-made pulse now waits until it has
   been off as long as it is on. The range is the core's, from its blanking;
   the bench fails if a sync reaches the picture at either end.
+- **The adapter takes everything on its pixel enable's rising edge.**
+  Colour, blanks and syncs are all latched there and nowhere else. An
+  optional width slider plays each line back faster or slower from a line
+  buffer, and fed the source's enable the picture snapped straight back to
+  the source's dots: at ±10% the bench measured every dot held exactly 7
+  clocks. Anything that changes the picture's timing inside the wrapper
+  has to make its own enable, here a pulse on every change.
 
 The picture the Analogizer gets is the one the Pocket gets, before the
 scaler-side blanking, bring-up panel included. A panel readable on a CRT is

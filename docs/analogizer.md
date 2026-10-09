@@ -30,12 +30,23 @@ core.
 | SNAC Assignment | the six below |
 | Analogizer H Position | ±16 dots in the skeleton (**SET** from the core's blanking); + moves the picture right |
 | Analogizer V Position | ±2 lines in the skeleton (**SET**); + moves the picture down |
+| Analogizer H Size | optional, for a core with menu room (the skeleton has none): percent, + wider; 15 kHz modes only |
 
 With **Analogizer** off the core behaves exactly as it did without Analogizer
 support. The adapter itself is set up as its wiki's
 [How to use it](https://github.com/RndMnkIII/Analogizer/wiki/How-to-use-it%3F)
 says: SNAC switch in position A, 5 V into its USB-C port, the SCART cable's
 audio jack in the Pocket's headphone socket.
+
+**Width.** An optional third slider, "Analogizer H Size", makes the
+15 kHz picture narrower or wider about its centre, in percent. A CRT has no
+digital width: the picture is as wide as its dots take to draw, so the
+core plays each line back a little faster or slower. Many consumer sets
+have no width control at all, and on a set stood on its side for a
+vertical game the width is the game's height. There is no vertical
+equivalent: a CRT's height is its sweep, and scaling lines would double
+or drop whole scanlines. The scandoubler modes are left alone (a VGA
+monitor has its own width control).
 
 **Position.** The two sliders move the picture on the CRT, in the core's
 own dots and lines, for a set whose picture sits off centre (the first one
@@ -157,6 +168,48 @@ before hsync and 2 lines before vsync, hence ±16 and ±2; Moo Mesa's gives
 ±24 and ±16. `sim/run_analogizer.sh` tries both ends of the range in
 `interact.json` and fails if csync is low while a dot is drawn.
 
+**Picture width.** `0xF700000C`, a signed slider in percent, scales the
+15 kHz picture's width about its centre (`pocket_analogizer`'s width
+stage). Each line's dots go into a two-line buffer, six bits a channel,
+and the line before is read back during this one, `A × (100 + n) / 100`
+clocks long where it was `A`, starting so its centre stays put: nearest
+dot, the index advancing by `dots / clocks` (20 fractional bits, from a
+divider run once a line) every clock. A dot is held `floor` or `ceil` of
+its new length, so at 48 MHz and 8 MHz dots a 10% stretch holds them 6 or 7
+clocks. All of a line's measures are the line before's. The picture comes
+a line late, so vblank does too and the position stage delays vsync by a
+line to match; the picture stays exactly where it was. Off (0), or in a
+scandoubler mode, everything passes through as before.
+
+The adapter module takes colour, blanks and syncs only on the *rising edge*
+of its pixel enable (`openFPGA_Pocket_Analogizer.v`, "Fix video"). Fed the
+source's enable, the scaled picture snapped back to the source's dots: the
+bench measured every dot held 7 clocks at ±10%. Scaled, the wrapper makes
+its own enable instead: a one-clock pulse whenever the dot, a blank or a
+sync changes, delayed a clock if it would follow another directly so the
+edge is still there. The bench now sees the 7/8 and 6/7 holds asked for.
+
+A stretched line may run past the source's own next hsync (H Position can
+have moved the output's later), so the read finishes the line from the
+buffer and vblank latched at its start.
+
+**Never into a sync.** Where H Position and H Size together would put
+picture on hsync or on the colour burst after it, the wrapper crops the
+picture's edge instead (`KEEP_CB`, from the previous line's hsync), so the
+set never loses sync; a player sees an edge go missing and backs off.
+
+**SET the width range from the blanking** with the picture centred: the
+wider picture grows into both porches by half the increase, and a player
+centres it with H Position first. The room is the line's whole free
+blanking (less hsync and the burst), not just the shorter porch. The bench
+centres the picture with H Position the way a player would (clamped to the
+menu's range), tries both ends of the width range there (±10% where the
+menu has no width entry) and fails if a line is the wrong length, off
+centre, missing or reordering dots, a dot is held the wrong time, or the
+picture moves vertically; then, at the largest width with H Position at
+either end, it fails if csync is ever low while a dot is drawn or the
+picture starts inside the colour burst.
+
 **The file scheme, not used here.** The adapter module 1.4 was written for
 `analogizer.bin`, a file Pupdate and AnalogizerConfigurator write to
 `/Assets/analogizer/common/`, loaded through a data slot at the same address.
@@ -226,6 +279,18 @@ place of `cont1..4_key`. **Wherever a core reads `cont*_key` directly**
     right after it (V +2 to -2 here; first seen failing in this bench, a
     frame of inverted csync) leaves csync out of the picture for three
     frames.
+  - Width, at +10% and -10% (no entry in the skeleton's menu), centred by
+    H Position -13: 224 lines of 2,465 and 2,017 clocks (asked 2,464 and
+    2,016), started 111 and 113 clocks earlier and later, centred to the
+    clock; every dot from the
+    first to the last in order, held 7 or 8 (6 or 7) clocks; the lines as
+    far from vsync as at 0; scandoubler unchanged; at 0 exactly as before.
+    At +10% with H Position at +16 and -16, csync is never low in the
+    picture and the burst is clear. Without the vsync's line of delay, the
+    picture comes a line low and the bench fails; with the source's pixel
+    enable in place of the wrapper's, every dot is held 7 clocks and it
+    fails; at +40% the corners stay clean with the crop and fail without
+    it (csync low for 25,312 clocks of picture).
   - The blank bit, and enable off again returning the port to idle.
 - `sim/lint.sh`: the wrapper lints clean. The vendored files' warnings are
   dropped by path; their errors are not.

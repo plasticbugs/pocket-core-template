@@ -150,6 +150,12 @@ would; vertically, until vsync reaches a picture line. The template's
 skeleton gives ±16 dots and ±2 lines, Moo Mesa ±24 and ±16. The bench
 tries both ends.
 
+Optionally, where the menu has room (vertical games most of all: with the
+CRT on its side, width is the game's height), "Analogizer H Size", id 76,
+at `0xF700000C`, a signed slider in percent. Its range comes from the
+line's whole free blanking with the picture centred (Namco and the Time
+Pilots ship ±20%); the bench centres it with H Position before measuring.
+
 The adapter module 1.4 was written to read `analogizer.bin` instead, a file
 Pupdate and AnalogizerConfigurator write to `/Assets/analogizer/common/`.
 The first version of this handoff said to use it. Do not: the adapter's
