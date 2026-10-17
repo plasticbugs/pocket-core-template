@@ -57,6 +57,7 @@ import sys
 #
 #     variables      up to 14      option values   up to 0x00C00000
 #     bytes          up to 7,597   options a list  up to 16
+#                    (11,568 loads since: SIZE_MAX below)
 #     longest name   26            defaultval      0..3
 #     options in the whole file    up to 52 then; 68 loads, 70 does not
 #                                  (measured since: HW_OPTS_MAX below)
@@ -70,7 +71,9 @@ import sys
 # installed core happened to have.
 NAME_MAX = 26
 OPTS_MAX = 16
-SIZE_MAX = 7600
+# Bytes: Atari System 2's 0.3.x interact.json is 11,568 bytes and loads on
+# the Pocket (its games play with it), so that is what is known to load.
+SIZE_MAX = 11568
 VARS_MAX = 16          # Analogue's documented limit
 ENTRIES_MAX = 20       # interact variables and data slots together
 

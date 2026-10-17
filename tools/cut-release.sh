@@ -27,6 +27,26 @@ fi
 if [ -n "$(git status --porcelain pkg target rtl platform projects)" ]; then
     echo "working tree has uncommitted core changes; commit them so the tag matches"; exit 1
 fi
+# Updaters and the openFPGA core library read version and date_release from
+# the core.json in the zip, not from the tag: a release whose version was
+# bumped but whose date was not was listed under the previous release's date
+# (fifteen Analogizer releases, 2026-10).  Every core.json must name this tag
+# and carry today's date.
+TODAY=$(date +%Y-%m-%d)
+for cj in pkg/pocket/Cores/*/core.json; do
+    python3 - "$cj" "$TAG" "$TODAY" <<'EOF' || exit 1
+import json, sys
+p, tag, today = sys.argv[1:4]
+m = json.load(open(p))['core']['metadata']
+bad = []
+if 'v' + m['version'] != tag and m['version'] != tag:
+    bad.append(f"version {m['version']} is not the tag {tag}")
+if m.get('date_release') != today:
+    bad.append(f"date_release {m.get('date_release')} is not today, {today}")
+if bad:
+    sys.exit(f"{p}: " + "; ".join(bad) + " -- bump both and commit")
+EOF
+done
 
 STAGE=$(mktemp -d)
 trap 'rm -rf "$STAGE"' EXIT
