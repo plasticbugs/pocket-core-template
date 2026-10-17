@@ -39,7 +39,14 @@
 module pocket_analogizer #(
     parameter int CLK_HZ   = 48_000_000, // frequency of `clk`
     parameter int LINE_LEN = 512,        // dots per whole line, blanking included
-    parameter int PIX_LAG  = 2           // source clocks from src_pix_ce to a settled pixel
+    parameter int PIX_LAG  = 2,          // source clocks from src_pix_ce to a settled pixel
+    parameter bit SAME_CLK = 1'b0,       // clk_src IS clk: no hand-over (below)
+    // leave out the adapter module's Y/C encoder, or its scandoubler (with
+    // HQ2x and the VGA scanlines), for a core with no room: their modes then
+    // show RGBS.  A local change to the vendored module (modules/VENDOR.md);
+    // 1, the default, is the module as RndMnkIII wrote it.
+    parameter int USE_YC   = 1,
+    parameter int USE_SD   = 1
 ) (
     input  wire         clk_74a,
     input  wire         clk,             // the Analogizer's clock, and the DAC's
@@ -106,25 +113,37 @@ module pocket_analogizer #(
     // Analogizer side takes it two or three of its clocks later, well inside
     // the pixel (CLK_HZ >= 4x the dot rate), and makes its own enable from
     // the toggle, so the two arrive together.
+    //
+    // SAME_CLK is for a core whose dots come faster than CLK_HZ / 4 (a 20 MHz
+    // dot, say; or a 15 kHz converter's output, ana_15k.sv, run on the
+    // Analogizer's own clock): the toggle could not keep up, so the core
+    // passes one clock as both `clk` and `clk_src` and the pixel is taken
+    // directly, PIX_LAG clocks after its enable (it must still be inside the
+    // dot).  From Xenophobe's core.
     logic [PIX_LAG-1:0] ce_sh;
-    logic        h_tog;
-    logic [27:0] h_pix;
-    always_ff @(posedge clk_src) begin
-        ce_sh <= PIX_LAG'({ce_sh, src_pix_ce});
-        if (ce_sh[PIX_LAG-1]) begin
-            h_pix <= {src_rgb, src_hs, src_vs, src_hb, src_vb};
-            h_tog <= ~h_tog;
-        end
-    end
-
-    logic [2:0]  a_tog;
     logic        a_ce;
     logic [27:0] a_pix;
-    always_ff @(posedge clk) begin
-        a_tog <= {a_tog[1:0], h_tog};
-        a_ce  <= a_tog[2] ^ a_tog[1];
-        if (a_tog[2] ^ a_tog[1]) a_pix <= h_pix;
-    end
+    always_ff @(posedge clk_src) ce_sh <= PIX_LAG'({ce_sh, src_pix_ce});
+    generate if (SAME_CLK) begin : g_same
+        always_ff @(posedge clk) begin
+            a_ce <= ce_sh[PIX_LAG-1];
+            if (ce_sh[PIX_LAG-1]) a_pix <= {src_rgb, src_hs, src_vs, src_hb, src_vb};
+        end
+    end else begin : g_handover
+        logic        h_tog;
+        logic [27:0] h_pix;
+        always_ff @(posedge clk_src)
+            if (ce_sh[PIX_LAG-1]) begin
+                h_pix <= {src_rgb, src_hs, src_vs, src_hb, src_vb};
+                h_tog <= ~h_tog;
+            end
+        logic [2:0]  a_tog;
+        always_ff @(posedge clk) begin
+            a_tog <= {a_tog[1:0], h_tog};
+            a_ce  <= a_tog[2] ^ a_tog[1];
+            if (a_tog[2] ^ a_tog[1]) a_pix <= h_pix;
+        end
+    end endgenerate
     wire       a_hs = a_pix[3], a_vs = a_pix[2];
 
     // --------------------------------------------------- the settings words
@@ -427,7 +446,8 @@ module pocket_analogizer #(
     wire [31:0] p1_joy, p2_joy;
 
     openFPGA_Pocket_Analogizer #(
-        .MASTER_CLK_FREQ(CLK_HZ), .LINE_LENGTH(LINE_LEN), .ADDRESS_ANALOGIZER_CONFIG(8'hF7)
+        .MASTER_CLK_FREQ(CLK_HZ), .LINE_LENGTH(LINE_LEN), .ADDRESS_ANALOGIZER_CONFIG(8'hF7),
+        .USE_YC(USE_YC), .USE_SD(USE_SD)
     ) u_analogizer (
         .clk_74a(clk_74a), .i_clk(clk), .i_rst_apf(a_rst), .i_rst_core(a_rst),
         .video_clk(clk),
