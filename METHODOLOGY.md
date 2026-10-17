@@ -1012,13 +1012,13 @@ core:
 
 ---
 
-### 5.30 The Analogizer: a second picture, and settings the player can find *(MSX2, Moo Mesa)*
+### 5.30 The Analogizer: a second picture, and settings the player can find *(MSX2, Moo Mesa, and fifteen retrofits)*
 
 RndMnkIII's Analogizer takes the core's own picture out of the cartridge slot
 to a CRT, and native pads in through SNAC. The template carries it on by
 default (`target/pocket/pocket_analogizer.sv` around his vendored module;
 `docs/analogizer.md`), and `docs/analogizer-retrofit.md` is the order of work
-for a core that predates it. Six lessons cost a round each:
+for a core that predates it. Ten lessons cost a round each:
 
 - **The scandoubler needs the whole line and real blanking.** It sizes its
   line buffer from `LINE_LEN` and times every output line from the H-blank
@@ -1077,10 +1077,79 @@ for a core that predates it. Six lessons cost a round each:
   the source's dots: at ±10% the bench measured every dot held exactly 7
   clocks. Anything that changes the picture's timing inside the wrapper
   has to make its own enable, here a pulse on every change.
+- **A board that is not 15 kHz shows copies of itself on a 15 kHz CRT.**
+  Xenophobe (31 kHz) came back as two playfields side by side, each cut at
+  its edges; Atari System 2 (25 kHz medium-res) as seven interlaced copies.
+  Nothing on the Pocket or in the bench, which checked the board's own
+  raster at the pins, pointed at it: the bench proved the signal was the
+  board's, and the board's is not what a PVM takes. `ana_15k.sv` now makes
+  a frame-locked progressive picture of half the lines, each line a blend of
+  a pair (or, "Sharp", the even one); a 480i picture would keep every line
+  and was rejected by the owner for its flicker on a PVM. Ask the line rate
+  before the first flash (`docs/analogizer-retrofit.md` 0.10).
+- **The firmware's menu limit is on options, and smaller than any
+  documented one.** Analogue documents 16 entries; the firmware also
+  refuses a menu with too many list options, with "Error in interact" and
+  then "error in core setup" at load. Atari System 2 at 70 options and BBC
+  Micro at 77 were refused, both load at 64, MSX2 at 68. `check_json.py`'s
+  earlier limit, 52, was a survey of installed cores, not a measurement; it
+  now fails above 68 options and 80 options plus entries, the largest seen
+  to load. Cut the Analogizer lists' rare options and the core's own
+  display extras before the game's settings.
+- **CI's tools are older than the Mac's, in two directions.** CI's
+  Verilator 5.020 cannot parse the vendored Y/C encoder's sine table and
+  will not lint the SNAC module without a waiver, so every Analogizer push
+  failed CI until a stub and the waiver went in; Quartus 18.1 cannot parse
+  `-12'(dh)`, which the lint fix introduced and pushed to six repos without
+  a map. Run the 5.020 container's lint *and* a Quartus map before pushing
+  RTL (`docs/analogizer-retrofit.md` 7).
+- **The cores that fill the FPGA need the module trimmed.** S.T.U.N.
+  Runner needed 102% with the whole adapter module; `USE_YC = 0` and
+  `USE_SD = 0` (a local, marked change to the vendored module) leave out the
+  Y/C encoder and the scandoubler with HQ2x, and it fits (Gaiapolis and
+  Master of Weapon too). Pole Position, at 103%, is without it so far.
+
+On hardware (2026-10, a PVM) the sixteen cores carrying it all show their
+picture, and a SNES pad over SNAC works in them.
 
 The picture the Analogizer gets is the one the Pocket gets, before the
 scaler-side blanking, bring-up panel included. A panel readable on a CRT is
 worth having the day the Pocket's screen is blanked on purpose.
+
+### 5.31 A Lua write to an analog port is not a player's input *(Atari System 2)*
+
+Atari System 2's pedals are MAME `IPT_PEDAL` fields, `PORT_MINMAX(0,0x3f)
+PORT_INVERT` over an 8-bit port: a player's pedal reads 0xff up and 0xc0
+floored, because MAME inverts the field's 0..0x3f within its mask. The
+traces drove the pedal with Lua's `field:set_value(n)`, and that writes the
+port's raw value, **clamped to the field's range and not inverted**:
+`set_value(63)`, `set_value(192)` and `set_value(255)` all give the game
+0x3f. A later change read those traces as "0x3f is the pedal up" and fed
+every game 0x3f released. APB was right with it; Super Sprint and
+Championship Sprint read 0x3f as floored, and for four releases their cars
+drove off on their own -- with or without the Analogizer the owner had
+just plugged in, which is what pointed away from the new work.
+
+Before believing a trace's input, read the port the game reads
+(`manager.machine.ioport.ports[":ADC0"]:read()`) with the field untouched
+and with it set, and compare the game's behaviour at both against a
+keyboard press in MAME. A measurement here took two headless runs: untouched,
+the port read 0xff and the track-select screen waited for the pedal; set to
+anything, it read 0x3f and the race started by itself.
+
+### 5.32 The core list reads `core.json`, not the tag *(fifteen releases)*
+
+Updaters and the openFPGA core library take a core's version **and its
+release date** from the `core.json` inside the release zip. Fifteen
+Analogizer releases bumped `"version"` and left `"date_release"` at the
+previous release's: the library listed them under dates weeks old, and the
+owner's updater did not surface them. A patch release of each, the same
+bitstream with today's date, fixed it. `tools/cut-release.sh` now refuses a
+`core.json` whose version is not the tag or whose date is not today.
+
+A second effect, not a fault: a Pocket whose card already has the build
+(copied for testing) shows no update for the release of that build, because
+its installed `core.json` already says that version.
 
 ## 6. Sizing the board: what changes the plan
 

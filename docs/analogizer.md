@@ -70,6 +70,17 @@ dots at 6.857 MHz, 15.17 kHz, 59.96 Hz.)
 "On, Pocket off" turns the Pocket's own picture black while the CRT keeps
 it.
 
+**A board that is not 15 kHz.** Some boards drew a medium-resolution (25 kHz)
+or VGA-rate (31 kHz) picture. Sent as it is, a 15 kHz monitor shows it as two
+images side by side (Xenophobe, 31 kHz) or as a stack of overlapping copies
+(Atari System 2, 25 kHz: seven). Such a core converts it (`ana_15k.sv`,
+below): each CRT line is the average of two of the game's lines, progressive,
+locked to the game's frame so nothing is dropped or torn, at half the game's
+lines (240p from 480, 192p from 384). Its "Analogizer" list then reads Off /
+On / On, Sharp / On, Pocket off / On, Sharp, Pocket off; Sharp shows each
+pair's even line instead of the blend. An interlaced picture would keep every
+line but flickers on a PVM; owners asked for the blend.
+
 **Controllers.** SNAC pads (DB15, NES, SNES, PC Engine 2/6-button and
 multitap, PlayStation) replace the Pocket's controls according to the
 **SNAC Assignment** chosen in the menu:
@@ -102,14 +113,15 @@ the adapter itself to the Analogizer project.
 
 | file | what |
 |---|---|
-| `target/pocket/analogizer/` | RndMnkIII's `openFPGA_Pocket_Analogizer` and what it instantiates, **verbatim** (modules/VENDOR.md has the commit). Its `analogizer.qip` is ours: only what is used. |
+| `target/pocket/analogizer/` | RndMnkIII's `openFPGA_Pocket_Analogizer` and what it instantiates, **verbatim** but for the `USE_YC`/`USE_SD` switches, a marked local change (modules/VENDOR.md has the commit and the change). Its `analogizer.qip` is ours: only what is used. |
 | `target/pocket/pocket_analogizer.sv` | the wrapper: clock hand-over, Y/C constants, SNAC → controller words. Core-agnostic; the same file in the template. |
 | `target/pocket/core_top.sv` | `USE_ANALOGIZER`, the instance (after the bring-up panel; **SET** its `LINE_LEN`), `key1..key4` in place of `cont1..4_key`, the bridge read at `0xF7xxxxxx`, the Pocket-screen blank, and the cart pins' idle levels when it is off. |
 | `core_pll` `outclk_4` | the Analogizer's 48 MHz, `clk_sys / 2` in phase; in the SDC's PLL group. |
-| `pkg/.../interact.json` | the entries above: ids 70–73, each a masked field of the word at `0xF7000000`, and 74–75, signed sliders at `0xF7000004` and `0xF7000008` (**SET** their range). The enable and the Pocket-screen blank share one entry: with the skeleton's bring-up entries the menu is at Analogue's limit of 16 (`tools/check_json.py`) |
+| `pkg/.../interact.json` | the entries above: ids 70–73, each a masked field of the word at `0xF7000000`, and 74–75, signed sliders at `0xF7000004` and `0xF7000008` (**SET** their range). The enable and the Pocket-screen blank share one entry: with the skeleton's bring-up entries the menu is at Analogue's limit of 16. The firmware has a second, smaller limit on options, below |
 | `pkg/.../core.json` | `"cartridge_adapter": 0` (powers the slot) |
 | `sim/run_analogizer.sh` | the bench (below); **SET** the raster at the top of `sim/tb_analogizer.sv` |
-| `tools/check_json.py` | fails if an entry writes outside its mask, none sets the enable, a position slider is not signed within ±127, a data slot also writes `0xF7000000`, or the slot is not powered |
+| `target/pocket/ana_15k.sv` | not used by the skeleton: the 15 kHz converter for a 25 or 31 kHz board (below); `sim/run_ana15k.sh` is its bench |
+| `tools/check_json.py` | fails if an entry writes outside its mask, none sets the enable, a position slider is not signed within ±127, a data slot also writes `0xF7000000`, the slot is not powered, or the menu has more options than the firmware takes |
 
 ### The settings word
 
@@ -220,6 +232,118 @@ Analogizer that stays dark, so the template uses the menu. A data slot at
 `0xF7000000` would load the file over the menu's word; `tools/check_json.py`
 refuses one.
 
+### The menu's size: "Error in interact"
+
+Analogue documents 16 entries (20 with the data slots). The firmware has a
+second limit on the options in the lists, and a core over it does not load:
+the Pocket says "Error in interact" (then "error in core setup"). Measured on
+hardware with these cores: Atari System 2 at 70 options and BBC Micro at 77
+were refused; both load at 64; MSX2 loads at 68 options (80 options and
+entries together). `tools/check_json.py` fails above 68 options or 80
+options plus entries, the largest known to load. The Analogizer's four lists
+are 32 options of that.
+
+To make room, cut in this order, asking the core's owner each time:
+
+1. the Analogizer lists' rarely used options: Y/C PAL, DB15 Fast, the PCE
+   2/6-button and SNES A,B<->X,Y variants, the PSX Fast variants, the
+   scandoubler's 25/50/75% (the template's lists are complete; trim a core's
+   copy, keeping each option's value);
+2. the core's own display extras the CRT makes redundant: Scanlines, Shadow
+   Mask;
+3. DIP switches nobody changes (demo sounds, a copyright notice, a
+   difficulty-adjacent setting the owner names), left at their defaults;
+4. "SNAC Assignment", for a core with one player (BBC Micro).
+
+Compact the file's layout too (one option to a line): Atari System 2's
+11,568-byte file loads, and `check_json.py`'s size limit is that.
+
+### A board that is not 15 kHz: `ana_15k.sv`
+
+The adapter passes the core's line rate through in every mode but the
+scandoubler, and a 15 kHz set cannot show 25 or 31 kHz (above, *For the
+player*). Note that the 31 kHz picture is *already* what the scandoubler
+modes make for a VGA monitor, and 15 kHz is what owners of PVMs and arcade
+monitors bought the adapter for.
+
+`target/pocket/ana_15k.sv` makes a 15 kHz picture of half the source's lines.
+Output line j shows source lines 2j and 2j+1, blended ((a + b) >> 1 a
+channel, top 6 bits) or the even one alone ("Sharp"), its dots played out at
+`DOT` clocks each so the picture keeps its shape. The output frame restarts
+`DELAY` clocks after the source's first visible line, every frame, and its
+lines add up to exactly the source frame (each line's last dot, deep in the
+back porch, takes the spare clocks, spread a clock at a time), so it never
+drops, repeats or tears a frame. Pairs wait in a ring the output reads. Two
+boards shipped with it:
+
+| | Atari System 2 (the defaults) | Xenophobe |
+|---|---|---|
+| source | 512 × 384 of 640 × 416, 6 clocks a dot (96 MHz), 25.0 kHz | 512 × 480 of 635 × 525, 2 clocks a dot (40 MHz), 31.5 kHz |
+| output | 192p: `DOT` 10, `DOTS` 609, `LINES` 262; 15.75 kHz, 60.1 Hz | 240p: `DOT` 4, `DOTS` 636, `LINES` 262; 15.72 kHz, 60 Hz |
+| `HS0`/`HS1`, `VS0`/`VS1` | 524/569, 219/222 | 527/574, 243/246 |
+| `RING`, `DELAY` | 48 pairs (a pair, 80 µs, is longer than an output line, so the output starts late and catches up), 336,000 | 2 (a pair takes about as long as a line), 1,400 |
+| `SRC_FRAME` | 1,597,440 | 666,750 |
+
+For a new board:
+
+1. Choose `DOT` so `DOTS × DOT` is close to `SRC_FRAME / LINES` (the line's
+   clocks) with `DOTS` near the source's horizontal total times the source's
+   clocks a dot over `DOT` (the same shape), and `LINES` 262 for 60 Hz.
+   `HS0`..`HS1` is 4.7 µs a few dots after the picture; `VS0` a few lines
+   after the last picture line (`SH / 2`), 3 lines long.
+2. Add the board's line to `CONFIGS` in `sim/run_ana15k.sh` and run it. It
+   checks every dot of six frames against its pair (Blend and Sharp), every
+   line's length, vsync's line and the frame period, and every ring read,
+   then prints the window `DELAY` may take. Set `DELAY` near its middle; the
+   script reruns a line outside each side and fails if either passes.
+3. Add `ana_15k.sv` to `core.qip` (the skeleton does not build it), and
+   instance it on the core's clock, fed the picture as the Pocket gets it
+   (`src_ce` the dot enable, `src_rgb`, `src_hb`, `src_vb`), and give its
+   outputs to `pocket_analogizer` as the source: `clk_src` the same clock,
+   `src_pix_ce = o_ce`, `src_hs/vs/hb/vb = o_*`, `LINE_LEN = DOTS`. The
+   adapter clock stays near 48 MHz (Atari System 2: `clk_sys / 2`, the
+   template's arrangement; Xenophobe: its 40 MHz `clk_sys` as both clocks
+   with `SAME_CLK = 1` and `PIX_LAG = 1`, because its converter's 10 MHz
+   dots come faster than the toggle hand-over takes).
+4. Sharp: give the "Analogizer" list two more options with bit 16 set
+   (`0x10020`, `0x14020`) and the mask `0xFFFEBFDF`. The adapter module
+   ignores bit 16; decode it from the bridge write in `core_top`:
+
+   ```verilog
+   reg sharp_74 = 1'b0;     // "On, Sharp": bit 16 with the enable (bit 5)
+   always @(posedge clk_74a)
+       if (bridge_wr && bridge_addr == 32'hF7000000)
+           sharp_74 <= bridge_wr_data[16] && bridge_wr_data[5];
+   ```
+   `ana_15k` synchronises `sharp` itself. (Xenophobe, which had a spare
+   menu entry, has "Analogizer Lines: Blend / Sharp" instead; bit 16 costs
+   no entry.)
+5. Set the position sliders' range from the *converter's* blanking (Atari
+   System 2: H -5..+12 dots, V -40..+27 lines), and the bench raster in
+   `tb_analogizer.sv` to the converter's output.
+6. Y/C becomes usable (the picture is now 15 kHz); the scandoubler modes
+   double the converted picture to 31 kHz, which a VGA monitor takes.
+
+Cost: the ring is `RING × 512 × 18` bits for a 512-dot line, so Atari
+System 2's 48 pairs are 442 kbit, about 44 M10K blocks, and Xenophobe's two
+pairs 2; the one-line buffer is 2 more. A board whose pair takes longer than an
+output line needs about `SH/2 × (1 − 63.5 µs / pair time)` pairs.
+
+### Fitting it: `USE_YC` and `USE_SD`
+
+The adapter module has no switches, so this template's copy of
+`openFPGA_Pocket_Analogizer.v` has two, `USE_YC` and `USE_SD` (default 1), a
+local change marked LOCAL in it and recorded in `modules/VENDOR.md`.
+`USE_YC = 0` leaves out `yc_out_legacy`; `USE_SD = 0` leaves out
+`scandoubler_2` (and the `Hq2x` inside it) and `scanlines_analogizer`.
+Their outputs are tied to the pass-through values and the video-type
+selector maps their modes (3–4, 5–9) to RGBS, so RGBS, RGsB and YPbPr take
+exactly the paths they did. With both at 1 the file builds exactly
+RndMnkIII's 1.4. `pocket_analogizer` forwards both. Take the dropped modes
+out of the core's "Analogizer Video" list. S.T.U.N. Runner needed 102% of
+the FPGA with the whole module and fits with both at 0 (Gaiapolis and
+Master of Weapon too); the scandoubler with HQ2x is the large part.
+
 ### Clocks
 
 `openFPGA_Pocket_Analogizer` runs its logic on `i_clk`, puts `video_clk` on the
@@ -232,7 +356,9 @@ in phase with `clk_sys`. `pocket_analogizer` takes each pixel `PIX_LAG` (2)
 system clocks after the dot enable into a holding register and hands it over
 with a toggle. The Analogizer side picks it up two or three of its clocks
 later, well inside the dot. A core whose `clk_sys` is already 40–50 MHz can
-pass `clk_sys` as both clocks. A core with an unrelated video clock can too,
+pass `clk_sys` as both clocks, and should set `SAME_CLK = 1` if its dots come
+faster than a quarter of that clock (the toggle cannot keep up): the pixel is
+then taken directly, `PIX_LAG` clocks after its enable. A core with an unrelated video clock can too,
 because the hand-over is a proper synchroniser, but the SDC then needs the two
 in separate asynchronous groups.
 
@@ -292,18 +418,35 @@ place of `cont1..4_key`. **Wherever a core reads `cont*_key` directly**
     fails; at +40% the corners stay clean with the crop and fail without
     it (csync low for 25,312 clocks of picture).
   - The blank bit, and enable off again returning the port to idle.
-- `sim/lint.sh`: the wrapper lints clean. The vendored files' warnings are
+- `sim/run_ana15k.sh`: the converter at Atari System 2's and Xenophobe's
+  parameters, every dot of six frames against its pair (Blend and Sharp,
+  0 differ), every hsync period one of the two lengths with exactly the
+  long ones a frame needs, vsync on its line, the frame period the
+  source's, and every ring read the right pair; a `DELAY` a line outside
+  the measured window on either side fails. Its Quartus 18.1 parse was
+  checked inside Atari System 2 (`./build-local.sh map`).
+- `sim/lint.sh`: the wrapper lints clean, as built and with `SAME_CLK`,
+  `USE_YC = 0` and `USE_SD = 0`; so does `ana_15k`. The vendored files' warnings are
   dropped by path; their errors are not.
 - Quartus: Moo Mesa compiles and closes timing with it, at a cost of 1,550
   ALMs, 13 RAM blocks and 2 DSP blocks. The template's own build is in the
   commit that added this.
 
-**Not proven:** anything on hardware with a core from this template (the
-adapter module itself ships in RndMnkIII's cores and in plasticbugs' MSX2),
-and the SNAC serial protocols, which are
-the adapter module's and are forced at its outputs in the bench rather than
-driven over the pins. The Y/C and YPbPr encodings have no reference to compare
-against, only a run without unknowns.
+**On hardware** (2026-10, one owner, a PVM): sixteen of plasticbugs' cores
+carry this wrapper, retrofitted from this template, and all show their
+picture on the PVM: Moo Mesa, NBA Jam, the Namco collection, Punch-Out!!
+(its lower screen, the upper one filling the Pocket), Time Pilot, Time
+Pilot '84, Cadash, BBC Micro, Smash T.V., Cloak & Dagger, S.T.U.N. Runner
+(`USE_YC = USE_SD = 0`), Xenophobe (240p), Gaiapolis, Pleiads, Master of
+Weapon and Atari System 2 (192p). A SNES pad over SNAC works in them. The
+H Size slider shipped on the vertical games (Namco, the Time Pilots,
+Cloak & Dagger).
+
+**Not proven:** the template's skeleton itself on hardware; the SNAC
+protocols other than SNES, which are the adapter module's and are forced
+at its outputs in the bench rather than driven over the pins; the Y/C and
+YPbPr encodings, which have no reference to compare against, only a run
+without unknowns.
 
 ### Turning it off
 

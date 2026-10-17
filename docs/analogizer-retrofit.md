@@ -10,7 +10,9 @@ from adding it to Moo Mesa (2026-10; `plasticbugs/moomesa`, branch
 `72271e8` used the settings file, `c631ff4` moved it to the menu, and
 `8187bfe` added the position sliders)
 and from the MSX2 core, where RndMnkIII and plasticbugs added it by hand
-(2026-08).
+(2026-08). Fifteen more of plasticbugs' cores followed this file in
+2026-10 and are on hardware (`docs/analogizer.md`, *On hardware*); what
+they taught is folded in below.
 
 The template is the source for every file named here. Copy from it rather
 than from another core: the copies in other cores drift, and RndMnkIII keeps
@@ -51,7 +53,11 @@ commit message:
    **1,550 ALMs, 13 RAM blocks and 2 DSP blocks** (265 → 278 of 308 blocks).
    The scandoubler's and HQ2x's line buffers scale with `LINE_LEN`. A core
    within ~15 blocks of 308 may not fit, so check the last fit summary before
-   starting.
+   starting. If it does not fit, the module's local `USE_YC = 0` and
+   `USE_SD = 0` leave out the Y/C encoder and the scandoubler with HQ2x
+   (`docs/analogizer.md`, *Fitting it*): S.T.U.N. Runner went from 102% to a
+   fit with both, Gaiapolis and Master of Weapon the same. Ask the owner
+   first; those modes leave the menu.
 7. **Bridge address `0xF7xxxxxx` is free.** Grep the core for anything
    decoding it, including a `casex` with `32'hFxxxxxxx`. The menu writes the
    settings word there.
@@ -60,15 +66,25 @@ commit message:
    its SNAC mapping until the user says otherwise.
 9. **Room in the menu.** The Analogizer adds six `interact.json` entries
    (four lists with 32 options, two sliders). Analogue allows 16 entries,
-   20 with the data slots; `tools/check_json.py` also holds a core to what
-   installed cores are seen to load: 52 options, 7,600 bytes. Count the
-   core's own before starting; if it is short of room, compact the file's
-   layout (one option to a line), then fold entries the way the template
-   folds the Pocket-screen blank into "Analogizer".
-10. **The blanking, for the position range.** How many dots between the
+   20 with the data slots, and the firmware refuses a menu with too many
+   options, with "Error in interact" at load: 70 and 77 were refused on
+   hardware, 64 and 68 load. `tools/check_json.py` fails above 68 options,
+   80 options plus entries, or 11,568 bytes. Count the core's own before
+   starting. If it is short of room, compact the file's layout (one option
+   to a line), then trim, asking the owner: the Analogizer lists' rarely
+   used options, then the core's Scanlines / Shadow Mask, then DIPs nobody
+   changes (`docs/analogizer.md`, *The menu's size*).
+10. **The line rate.** If the board is not 15 kHz (a 25 kHz medium-res or
+   a 31 kHz VGA-rate monitor), a 15 kHz CRT shows its picture as two or
+   more copies. Plan `target/pocket/ana_15k.sv` between the core and the
+   wrapper (`docs/analogizer.md`, *A board that is not 15 kHz*), with its
+   bench, before anything goes to hardware. Xenophobe and Atari System 2
+   both went out without it first and came back doubled and in seven.
+11. **The blanking, for the position range.** How many dots between the
    end of the picture and hsync, and between hsync's end and the next
    picture; how many lines between the picture and vsync on each side.
-   They set the two position sliders' range (section 4).
+   They set the two position sliders' range (section 4); with `ana_15k`,
+   the converter's blanking.
 
 ## 1. Copy the files
 
@@ -78,10 +94,18 @@ From the template into the core, unchanged:
 target/pocket/analogizer/            RndMnkIII's module, 15 files + our analogizer.qip
 target/pocket/pocket_analogizer.sv   the wrapper
 sim/ps2_keyboard_stub.v              Verilator stand-in for the one VHDL file
+sim/yc_out_legacy_stub.v             stand-in for yc_out_legacy.sv in lint (CI's Verilator 5.020)
 sim/tb_analogizer.sv                 the bench (set its raster, step 7)
 sim/run_analogizer.sh
 tools/check_json.py                  or merge its Analogizer block, if the core's copy differs
 docs/analogizer.md                   then set the core's numbers in it
+```
+
+and, for a board that is not 15 kHz (step 0.10):
+
+```
+target/pocket/ana_15k.sv             the converter
+sim/tb_ana15k.sv sim/run_ana15k.sh   its bench; add the board's line to CONFIGS
 ```
 
 If the core's layout differs (`src/fpga/...`), put the two Verilog pieces
@@ -202,7 +226,17 @@ but paths.
 
 ## 7. Prove it, in this order
 
-1. `sim/lint.sh` with the Analogizer block from the template's `lint.sh`.
+1. `sim/lint.sh` with the Analogizer block from the template's `lint.sh`,
+   and once more as CI runs it: CI's Verilator is 5.020, older than a
+   Mac's, and cannot parse the vendored `yc_out_legacy.sv` (the template's
+   lint uses `sim/yc_out_legacy_stub.v` in its place) or lint the SNAC
+   module without `-Wno-BLKANDNBLK`. Every Analogizer push failed CI until
+   that was found.
+
+   ```sh
+   docker run --rm --platform linux/amd64 -v "$PWD":/w -w /w \
+       --entrypoint sh verilator/verilator:v5.020 -c ./sim/lint.sh
+   ```
 2. `sim/run_analogizer.sh`, after setting the raster at the top of
    `sim/tb_analogizer.sv` to the core's: system clocks per dot, totals,
    visible window, sync positions, `CLK_HZ`. It must print `PASS`, and the
@@ -226,14 +260,35 @@ but paths.
    `dram_dq -> dq_in` hold is the first thing to go negative. It did on the
    template's skeleton: -0.058 ns at fast 0C, fixed by re-balancing the
    SDRAM clock phase as the SDC describes (METHODOLOGY 5.20), not by touching
-   the Analogizer. Moo Mesa kept +0.080 ns at the old phase.
+   the Analogizer. Moo Mesa kept +0.080 ns at the old phase; the Namco
+   collection went to -0.011 ns and needed 5,990 -> 6,120 ps; S.T.U.N.
+   Runner moved to 6,376 ps.
+
+   **Before every push of RTL, run a Quartus map or compile**, even for a
+   rewrite that only satisfies the linter: a lint fix (`-12'(dh)` for
+   `12'(-dh)`) that Verilator accepted broke Quartus 18.1 in six repos at
+   once, because it was pushed without a map. `12'd0 - 12'(dh)` satisfies
+   both.
 5. On hardware, `docs/bringup.md`'s "With an Analogizer" order: first with
    "Analogizer: Off" (the core must be exactly as before), then RGBS, then
    each mode, then SNAC, then that the menu remembers its settings across a
    reload and that changing one entry leaves the others alone, then the
    position sliders.
 
-## 8. Commit message
+## 8. Release
+
+Release the bitstream that was on the card when the owner confirmed it, not
+a rebuild (`tools/cut-release.sh <tag> <bitstream.rbf_r>`). Bump
+`"version"` **and** `"date_release"` in `core.json` together: updaters and
+the openFPGA core library read both from the zip's `core.json`, not from
+the tag, and fifteen Analogizer releases went out with the new version and
+the old date, listed as weeks old until a patch release fixed the date.
+The template's `cut-release.sh` refuses a `core.json` whose version is not
+the tag or whose date is not today; a core with an older copy should take
+that check. Release notes: Analogizer support, the modes, the sliders, any
+menu entries removed to make room, and the hardware it was seen on.
+
+## 9. Commit message
 
 Say what was measured (the bench's lines, lint, the fit and timing numbers)
 and what was **not**: no hardware, no CRT, SNAC protocols only as the

@@ -117,6 +117,9 @@ until it is checked, and commit at each one.
 | Analogizer support that the Pocket never configures: a menu entry writing outside its mask, no entry setting the enable, a file slot loading over the menu's word, cart slot unpowered | `tools/check_json.py` checks the entries at `0xF7000000`, the slots and `cartridge_adapter` | 5.30 |
 | Analogizer menu entries wiping each other: the bridge samples read data before it pulses `bridge_rd`, so a read-back latched on the pulse is the previous read's | `pocket_analogizer.sv` reads the word back combinationally; `sim/run_analogizer.sh` sets every option by read-merge-write and fails without it | 5.30 |
 | Analogizer scandoubler sized to the visible width, or fed no blanking | `LINE_LEN` is the whole line; `sim/run_analogizer.sh` counts the doubled lines | 5.30 |
+| A menu the firmware refuses at load with "Error in interact": too many list options (70 and 77 refused, 64 and 68 load) | `tools/check_json.py` fails above 68 options or 80 options plus entries | 5.30 |
+| A 25 or 31 kHz board on a 15 kHz CRT: two or seven copies of the picture | `target/pocket/ana_15k.sv`, a frame-locked half-line-count picture; `sim/run_ana15k.sh` checks it and prints its `DELAY` window | 5.30 |
+| A release the core list shows under the previous release's date | `tools/cut-release.sh` refuses a `core.json` whose version is not the tag or whose `date_release` is not today | 5.32 |
 
 Not defusable in code -- read these before you meet them:
 
@@ -134,11 +137,18 @@ Not defusable in code -- read these before you meet them:
   read `key1..key4`, never `cont*_key`, wherever the game takes its
   controls, or SNAC pads will not reach it, and keep its six menu entries
   (ids 70-75, `0xF7000000`-`0xF7000008`) when you write the game's own into
-  `interact.json` -- Analogue's limit is 16 entries, 20 with the data slots.
+  `interact.json` -- Analogue's limit is 16 entries, 20 with the data slots, and the
+  firmware's is 68 list options (`tools/check_json.py`).
   Set the two position sliders' range from the new raster's blanking;
   the bench fails if a sync reaches the picture at either end (5.30).
 - **An emulator's saved settings are hidden state**: give each investigation
   its own `-cfg_directory` / `-nvram_directory` (5.29).
+- **Lua's `set_value` on an analog field writes the raw port value, clamped
+  and not inverted** -- not what a player's press gives the game. Read the
+  port the game reads before trusting a trace's input (5.31).
+- **CI runs Verilator 5.020 and Quartus 18.1, both older than yours**: before
+  pushing RTL, lint in the `verilator/verilator:v5.020` container and run
+  `./build-local.sh map`; a fix for one has broken the other (5.30).
 
 ## The map
 
@@ -157,6 +167,7 @@ target/pocket/core_top.sv               APF glue; game-specific only below "@ Th
 target/pocket/mycore_mem.sv             SDRAM clients, download FIFO, burst arbiter, SRAM
 target/pocket/sdram_ctrl.sv sram_port.sv   proven on hardware; do not edit casually
 target/pocket/pocket_analogizer.sv     the Analogizer: clock hand-over, Y/C, SNAC -> key1..4
+target/pocket/ana_15k.sv               a 15 kHz picture from a 25/31 kHz board, for the Analogizer
 target/pocket/analogizer/              RndMnkIII's adapter module, verbatim (docs/analogizer.md)
 projects/                               Quartus project, SDC, report_worst.tcl
 platform/pocket/                        OpenGateware's gateman-pocket (Marcus Andrade) — leave alone
@@ -182,6 +193,7 @@ tools/check_json.py pkg/pocket --active WxH       # what the firmware silently r
 sim/run_mem.sh -quick        # a minute; after touching mycore_mem.sv (drop -quick before a flash)
 sim/run_system.sh -frames 10 # the whole machine through the real memory glue
 sim/run_analogizer.sh        # the Analogizer path, read at the cartridge pins
+sim/run_ana15k.sh            # the 15 kHz converter, if the board is not 15 kHz
 tools/vendor.sh              # list the CPU and sound cores it can fetch from upstream
 ./build-local.sh map         # two minutes; catches what Verilator cannot
 ./build-local.sh compile     # 10-25 minutes; then read projects/output_files/*.sta.summary
