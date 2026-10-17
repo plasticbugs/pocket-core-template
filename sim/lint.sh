@@ -68,13 +68,26 @@ fi
 # yc_out_legacy.sv goes through sim/yc_out_legacy_stub.v (its sine table, a
 # wire array with an initial value, is past CI's Verilator 5.020), and
 # BLKANDNBLK in the vendored SNAC module is waived (5.020 cannot lint it).
-printf '%-20s ' "analogizer"
+# Twice: as built, and with the options a core may set (SAME_CLK, and the
+# adapter module's USE_YC / USE_SD, its one local change).
 A="$root"/target/pocket/analogizer
-out=$(verilator --lint-only $OPTS -Wno-PROCASSWIRE -Wno-BLKANDNBLK "$WAIVE" --top-module pocket_analogizer \
-      "$root"/target/pocket/pocket_analogizer.sv "$root"/platform/pocket/helpers/synch_3.sv \
-      "$A"/*.v $(ls "$A"/*.sv | grep -v /yc_out_legacy.sv) "$here"/yc_out_legacy_stub.v "$here"/ps2_keyboard_stub.v 2>&1 \
-      | grep -E '^%(Error|Warning)' | grep -v 'Exiting due to' \
-      | grep -v -E '^%Warning[^ ]*: [^ ]*/(target/pocket/analogizer|platform/pocket)/' || true)
+for v in "" "-GSAME_CLK=1'b1 -GUSE_YC=0 -GUSE_SD=0"; do
+    printf '%-20s ' "analogizer${v:+ options}"
+    out=$(verilator --lint-only $OPTS -Wno-PROCASSWIRE -Wno-BLKANDNBLK "$WAIVE" --top-module pocket_analogizer $v \
+          "$root"/target/pocket/pocket_analogizer.sv "$root"/platform/pocket/helpers/synch_3.sv \
+          "$A"/*.v $(ls "$A"/*.sv | grep -v /yc_out_legacy.sv) "$here"/yc_out_legacy_stub.v "$here"/ps2_keyboard_stub.v 2>&1 \
+          | grep -E '^%(Error|Warning)' | grep -v 'Exiting due to' \
+          | grep -v -E '^%Warning[^ ]*: [^ ]*/(target/pocket/analogizer|platform/pocket)/' || true)
+    if [ -z "$out" ]; then echo ok
+    else echo; echo "$out" | sed 's/^/    /'; fail=1
+    fi
+done
+
+# the 15 kHz converter for a board that is not 15 kHz (docs/analogizer.md)
+printf '%-20s ' "ana_15k"
+out=$(verilator --lint-only $OPTS "$WAIVE" --top-module ana_15k \
+      "$root"/target/pocket/ana_15k.sv 2>&1 \
+      | grep -E '^%(Error|Warning)' | grep -v 'Exiting due to' || true)
 if [ -z "$out" ]; then echo ok
 else echo; echo "$out" | sed 's/^/    /'; fail=1
 fi
